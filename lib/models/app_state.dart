@@ -1,16 +1,15 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'device.dart';
 import 'file_info.dart';
 import 'transfer_session.dart';
 import 'app_settings.dart';
 
-//ChangeNotifier is a class that adds a list of listeners
 class AppState extends ChangeNotifier {
-  final List<Device> discoveredDevices;
-  final FileInfo? selectedFile;
-  final TransferSession? activeTransfer;
-  final AppSettings settings;
-  final bool isListening;
+  List<Device> discoveredDevices;
+  FileInfo? selectedFile;
+  TransferSession? activeTransfer;
+  AppSettings settings;
+  bool isListening;
 
   AppState({
     required this.discoveredDevices,
@@ -19,4 +18,29 @@ class AppState extends ChangeNotifier {
     required this.settings,
     required this.isListening,
   });
+
+  void addDevice(Device device) {
+    discoveredDevices.add(device);
+    notifyListeners();
+  }
+
+  void setSelectedFile(FileInfo file) {
+    selectedFile = file;
+    notifyListeners();
+  }
+
+  void setActiveTransfer(TransferSession? session) {
+    activeTransfer = session;
+    notifyListeners();
+  }
+
+  void setListening(bool value) {
+    isListening = value;
+    notifyListeners();
+  }
+
+  void updateSettings(AppSettings newSettings) {
+    settings = newSettings;
+    notifyListeners();
+  }
 }
