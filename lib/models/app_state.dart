@@ -1,9 +1,11 @@
+import 'package:flutter/material.dart';
 import 'device.dart';
 import 'file_info.dart';
 import 'transfer_session.dart';
 import 'app_settings.dart';
 
-class AppState {
+//ChangeNotifier is a class that adds a list of listeners
+class AppState extends ChangeNotifier {
   final List<Device> discoveredDevices;
   final FileInfo? selectedFile;
   final TransferSession? activeTransfer;
