@@ -1,0 +1,20 @@
+/lib
+  main.dart
+  /models
+    device.dart
+    file_info.dart
+    transfer_session.dart
+    app_settings.dart
+    app_state.dart
+  /screens
+    discovery_screen.dart
+    send_screen.dart
+    incoming_request_dialog.dart
+    transfer_progress_screen.dart
+    settings_screen.dart
+  /services
+    udp_discovery_service.dart
+    tcp_transfer_service.dart
+    file_service.dart
+  /state
+    app_state_provider.dart
