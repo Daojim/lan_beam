@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lan_beam/screens/discovery_screen.dart';
 import 'package:provider/provider.dart';
 import 'models/app_state.dart';
 import 'models/app_settings.dart';
