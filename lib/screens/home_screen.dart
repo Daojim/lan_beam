@@ -37,6 +37,17 @@ class HomeScreen extends StatelessWidget {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             Text(appState.isListening ? 'Yes' : 'No'),
+
+            const SizedBox(height: 16),
+
+            ElevatedButton(
+              onPressed: () {
+                appState.setListening(!appState.isListening);
+              },
+              child: Text(
+                appState.isListening ? 'Stop Listening' : 'Start Listening',
+              ),
+            ),
           ],
         ),
       ),
