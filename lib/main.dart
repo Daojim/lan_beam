@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:lan_beam/screens/discovery_screen.dart';
 import 'package:provider/provider.dart';
 import 'models/app_state.dart';
 import 'models/app_settings.dart';
-import 'screens/home_screen.dart';
+import 'screens/main_screen.dart';
 
 void main() {
   runApp(
@@ -28,6 +27,6 @@ class LanBeamApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(title: 'LAN Beam', home: const DiscoveryScreen());
+    return MaterialApp(title: 'LAN Beam', home: const MainScreen());
   }
 }
