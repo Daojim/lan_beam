@@ -28,6 +28,6 @@ class LanBeamApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(title: 'LAN Beam', home: const HomeScreen());
+    return MaterialApp(title: 'LAN Beam', home: const DiscoveryScreen());
   }
 }
