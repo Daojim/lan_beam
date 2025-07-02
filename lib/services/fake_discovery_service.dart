@@ -1,6 +1,6 @@
 import '../models/device.dart';
 
-class FakeDiscoveryScreen {
+class FakeDiscoveryService {
   static final List<Device> _sampleDevices = [
     Device(
       name: 'Jimmy-Desktop',
