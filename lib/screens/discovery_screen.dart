@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'dart:math';
 import '../models/app_state.dart';
 import '../models/device.dart';
-import '../services/fake_discovery_screen.dart';
+import '../services/fake_discovery_service.dart';
 
 class DiscoveryScreen extends StatelessWidget {
   const DiscoveryScreen({super.key});
@@ -42,17 +42,29 @@ class DiscoveryScreen extends StatelessWidget {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
-                final random = Random();
-                final fakeDevice = Device(
-                  name: 'Device-${random.nextInt(1000)}',
-                  ipAddress: '192.168.1.${random.nextInt(255)}',
-                  status: random.nextBool()
-                      ? DeviceStatus.available
-                      : DeviceStatus.busy,
-                );
-                appState.addDevice(fakeDevice);
+                final nextDevice = FakeDiscoveryService.getNextDevice();
+                if (nextDevice != null) {
+                  appState.addDevice(nextDevice);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('No more devices to discover.'),
+                    ),
+                  );
+                }
               },
-              child: const Text('Add Fake Device'),
+              child: const Text('Add Test Device'),
+            ),
+
+            const SizedBox(height: 8),
+
+            ElevatedButton(
+              onPressed: () {
+                appState.discoveredDevices.clear();
+                FakeDiscoveryService.reset();
+                appState.notifyListeners();
+              },
+              child: const Text('Clear Devices'),
             ),
           ],
         ),
