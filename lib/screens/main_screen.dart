@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'discovery_screen.dart';
+import 'settings_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -12,9 +13,13 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = [HomeScreen(), DiscoveryScreen()];
+  final List<Widget> _screens = [
+    HomeScreen(),
+    DiscoveryScreen(),
+    SettingsScreen(),
+  ];
 
-  final List<String> _titles = ['Home', 'Discovery'];
+  final List<String> _titles = ['Home', 'Discovery', 'Settings'];
 
   void _onItemTapped(int index) {
     setState(() {
@@ -47,6 +52,11 @@ class _MainScreenState extends State<MainScreen> {
               leading: const Icon(Icons.devices),
               title: const Text('Discovery'),
               onTap: () => _onItemTapped(1),
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings),
+              title: const Text('Settings'),
+              onTap: () => _onItemTapped(2),
             ),
           ],
         ),
