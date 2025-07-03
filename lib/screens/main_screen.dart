@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'discovery_screen.dart';
 import 'settings_screen.dart';
+import 'transfer_progress_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -17,9 +18,15 @@ class _MainScreenState extends State<MainScreen> {
     HomeScreen(),
     DiscoveryScreen(),
     SettingsScreen(),
+    TransferProgressScreen(),
   ];
 
-  final List<String> _titles = ['Home', 'Discovery', 'Settings'];
+  final List<String> _titles = [
+    'Home',
+    'Discovery',
+    'Settings',
+    'Transfer Progress',
+  ];
 
   void _onItemTapped(int index) {
     setState(() {
@@ -57,6 +64,11 @@ class _MainScreenState extends State<MainScreen> {
               leading: const Icon(Icons.settings),
               title: const Text('Settings'),
               onTap: () => _onItemTapped(2),
+            ),
+            ListTile(
+              leading: const Icon(Icons.swap_horiz),
+              title: const Text('Transfer Progress'),
+              onTap: () => _onItemTapped(3),
             ),
           ],
         ),
