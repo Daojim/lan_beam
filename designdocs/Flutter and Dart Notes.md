@@ -96,3 +96,13 @@ It lives above your Scaffold in the widget tree.
 - Manages queueing multiple SnackBars
 - Makes SnackBars survive route changes (navigation)
 - Controls showing, hiding and dismissing SnackBars centrally.
+
+### What are the question marks next to the parameter types?
+
+In Dart, the "?" means the type is nullable
+
+### What do the double question marks mean?
+
+This is Dart's null-coalescing operation
+
+a ?? b means: "If a is not null, use a. Else, use b."

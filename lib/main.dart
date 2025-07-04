@@ -13,22 +13,7 @@ void main() {
       create: (_) => AppState(
         discoveredDevices: [],
         selectedFile: null,
-        activeTransfer: TransferSession(
-          direction: TransferDirection.sending,
-          file: FileInfo(
-            fileName: 'example.zip',
-            fileSizeBytes: 5982345,
-            fileType: '.zip',
-            filePath: '',
-          ),
-          progress: 0.0,
-          status: TransferStatus.idle,
-          peerDevice: Device(
-            name: 'Jimmy-PC',
-            ipAddress: '192.168.1.101',
-            status: DeviceStatus.available,
-          ),
-        ),
+        activeTransfer: null,
         settings: AppSettings(
           localDeviceName: 'MyDevice',
           defaultSaveFolder: 'C:/Users/Jimmy/Downloads',
