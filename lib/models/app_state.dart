@@ -43,4 +43,9 @@ class AppState extends ChangeNotifier {
     settings = newSettings;
     notifyListeners();
   }
+
+  void toggleListening() {
+    isListening = !isListening;
+    notifyListeners();
+  }
 }
