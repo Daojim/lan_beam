@@ -3,9 +3,6 @@ import 'package:provider/provider.dart';
 import 'models/app_state.dart';
 import 'models/app_settings.dart';
 import 'screens/main_screen.dart';
-import 'models/transfer_session.dart';
-import 'models/file_info.dart';
-import 'models/device.dart';
 
 void main() {
   runApp(
