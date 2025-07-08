@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/app_state.dart';
 import '../models/device.dart';
+import '../models/transfer_session.dart';
 import '../services/fake_discovery_service.dart';
+import './transfer_progress_screen.dart';
 
 class DiscoveryScreen extends StatelessWidget {
   const DiscoveryScreen({super.key});
@@ -29,10 +31,41 @@ class DiscoveryScreen extends StatelessWidget {
                           leading: const Icon(Icons.devices),
                           title: Text(device.name),
                           subtitle: Text(device.ipAddress),
-                          trailing: Text(
-                            device.status == DeviceStatus.available
-                                ? 'Available'
-                                : 'Busy',
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                device.status == DeviceStatus.available
+                                    ? 'Available'
+                                    : 'Busy',
+                              ),
+                              const SizedBox(width: 8),
+                              ElevatedButton(
+                                onPressed: appState.selectedFile == null
+                                    ? null
+                                    : () {
+                                        // Simulate starting a transfer
+                                        appState.setActiveTransfer(
+                                          TransferSession(
+                                            direction:
+                                                TransferDirection.sending,
+                                            file: appState.selectedFile!,
+                                            progress: 0.0,
+                                            status: TransferStatus.connecting,
+                                            peerDevice: device,
+                                          ),
+                                        );
+                                        // Navigate to TransferProgressScreen
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                const TransferProgressScreen(),
+                                          ),
+                                        );
+                                      },
+                                child: const Text('Send'),
+                              ),
+                            ],
                           ),
                         );
                       },
