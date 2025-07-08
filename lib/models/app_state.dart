@@ -24,7 +24,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setSelectedFile(FileInfo file) {
+  void setSelectedFile(FileInfo? file) {
     selectedFile = file;
     notifyListeners();
   }
