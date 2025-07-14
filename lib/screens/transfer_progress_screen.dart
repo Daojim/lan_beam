@@ -15,28 +15,56 @@ class TransferProgressScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('Transfer Progress')),
       body: session == null
           ? const Center(child: Text('No active transfer session.'))
-          : Padding(
+          : SingleChildScrollView(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('File: ${session.file.fileName}'),
-                  const SizedBox(height: 8),
-                  Text('Size: ${session.file.fileSizeBytes} bytes'),
-                  const SizedBox(height: 8),
+                  Card(
+                    elevation: 2,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'File: ${session.file.fileName}',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          Text('Size: ${session.file.formattedSize}'),
+                          const SizedBox(height: 8),
+                          Text('Type: ${session.file.fileType}'),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Sending To:',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${session.peerDevice.name} (${session.peerDevice.ipAddress})',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
                   Text(
-                    'Peer: ${session.peerDevice.name} (${session.peerDevice.ipAddress})',
+                    'Transfer Status:',
+                    style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 8),
-                  Text('Direction: ${session.direction.name}'),
-                  const SizedBox(height: 8),
-                  Text('Status: ${session.status.name}'),
+                  Text(
+                    session.status.name.toUpperCase(),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.headlineSmall?.copyWith(color: Colors.blue),
+                  ),
                   const SizedBox(height: 16),
                   LinearProgressIndicator(value: session.progress),
                   const SizedBox(height: 32),
                   ElevatedButton(
                     onPressed: () {
-                      // For demo/testing: simulate progress
                       double newProgress = (session.progress + 0.1).clamp(
                         0.0,
                         1.0,
