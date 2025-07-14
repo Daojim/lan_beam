@@ -83,7 +83,7 @@ class HomeScreen extends StatelessWidget {
             else ...[
               Text('File Name: ${selectedFile.fileName}'),
               Text('File Type: ${selectedFile.fileType}'),
-              Text('File Size: ${selectedFile.fileSizeBytes} bytes'),
+              Text('File Size: ${selectedFile.formattedSize}'),
             ],
           ],
         ),
