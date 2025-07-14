@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/app_state.dart';
 import '../models/file_info.dart';
+import 'package:file_picker/file_picker.dart';
 
 class FilePickerScreen extends StatelessWidget {
   const FilePickerScreen({super.key});
@@ -27,19 +28,33 @@ class FilePickerScreen extends StatelessWidget {
             ],
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () {
-                // For now: simulate picking a file
-                appState.setSelectedFile(
-                  FileInfo(
-                    fileName: 'example_document.pdf',
-                    fileSizeBytes: 234567,
-                    fileType: '.pdf',
-                    filePath: '/fake/path/example_document.pdf',
-                  ),
-                );
+              onPressed: () async {
+                FilePickerResult? result = await FilePicker.platform
+                    .pickFiles();
+
+                if (result != null && result.files.isNotEmpty) {
+                  final pickedFile = result.files.first;
+
+                  appState.setSelectedFile(
+                    FileInfo(
+                      fileName: pickedFile.name,
+                      fileSizeBytes: pickedFile.size,
+                      fileType: pickedFile.extension != null
+                          ? '.${pickedFile.extension}'
+                          : '',
+                      filePath: pickedFile.path ?? '',
+                    ),
+                  );
+                } else {
+                  // User canceled picking
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('No file selected')),
+                  );
+                }
               },
-              child: const Text('Pick File (Simulated)'),
+              child: const Text('Pick File'),
             ),
+
             const SizedBox(height: 8),
             ElevatedButton(
               onPressed: () {
