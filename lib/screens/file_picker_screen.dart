@@ -23,7 +23,7 @@ class FilePickerScreen extends StatelessWidget {
               const Text('No file selected.')
             else ...[
               Text('File Name: ${file.fileName}'),
-              Text('File Size: ${file.fileSizeBytes} bytes'),
+              Text('File Size: ${file.formattedSize}'),
               Text('File Type: ${file.fileType}'),
             ],
             const SizedBox(height: 16),
