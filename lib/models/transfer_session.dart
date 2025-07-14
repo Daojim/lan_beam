@@ -20,13 +20,19 @@ class TransferSession {
     required this.peerDevice,
   });
 
-  TransferSession copyWith({double? progress, TransferStatus? status}) {
+  TransferSession copyWith({
+    TransferDirection? direction,
+    FileInfo? file,
+    double? progress,
+    TransferStatus? status,
+    Device? peerDevice,
+  }) {
     return TransferSession(
-      direction: direction,
-      file: file,
+      direction: direction ?? this.direction,
+      file: file ?? this.file,
       progress: progress ?? this.progress,
       status: status ?? this.status,
-      peerDevice: peerDevice,
+      peerDevice: peerDevice ?? this.peerDevice,
     );
   }
 }
