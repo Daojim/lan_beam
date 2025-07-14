@@ -41,10 +41,36 @@ class DiscoveryScreen extends StatelessWidget {
                               ),
                               const SizedBox(width: 8),
                               ElevatedButton(
-                                onPressed: appState.selectedFile == null
+                                onPressed:
+                                    appState.selectedFile == null ||
+                                        device.status != DeviceStatus.available
                                     ? null
                                     : () {
-                                        // Simulate starting a transfer
+                                        if (appState.selectedFile == null) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Please pick a file first',
+                                              ),
+                                            ),
+                                          );
+                                          return;
+                                        }
+
+                                        if (device.status !=
+                                            DeviceStatus.available) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Device is busy.'),
+                                            ),
+                                          );
+                                          return;
+                                        }
+
                                         appState.setActiveTransfer(
                                           TransferSession(
                                             direction:
@@ -55,7 +81,7 @@ class DiscoveryScreen extends StatelessWidget {
                                             peerDevice: device,
                                           ),
                                         );
-                                        // Navigate to TransferProgressScreen
+
                                         Navigator.of(context).push(
                                           MaterialPageRoute(
                                             builder: (context) =>
@@ -63,6 +89,7 @@ class DiscoveryScreen extends StatelessWidget {
                                           ),
                                         );
                                       },
+
                                 child: const Text('Send'),
                               ),
                             ],
