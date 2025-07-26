@@ -4,6 +4,7 @@ import '../models/app_state.dart';
 import '../models/transfer_session.dart';
 import '../models/device.dart';
 import '../screens/incoming_request_screen.dart';
+import '../main.dart'; // gives access to `tcpFileReceiver`
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -31,6 +32,11 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
+                if (appState.isListening) {
+                  tcpFileReceiver.stopListening();
+                } else {
+                  tcpFileReceiver.startListening();
+                }
                 appState.toggleListening();
               },
               child: Text(
