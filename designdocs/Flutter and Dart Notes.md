@@ -106,3 +106,30 @@ In Dart, the "?" means the type is nullable
 This is Dart's null-coalescing operation
 
 a ?? b means: "If a is not null, use a. Else, use b."
+
+### What is async?
+
+async marks a function as asynchronous - meaning it runs without blocking the main thread.
+
+- Flutter is single-threaded so if you do something slow without async, your UI will freeze there
+- async lets the app do something in the background while continuing to respond to taps, gestures, etc.
+
+### What is utf-8.decode and jsonDecode?
+
+utf-8 decode takes raw bytes (received from the network) and turns them into a readable String.
+When you receive a UDP packet:
+
+- You get a List<int> like `[123, 34, 110, 97, 109, 101, 34, 58, 34, 74, 105, 109, 109, 121...]`
+  - This is UTF-8 encoded bytes
+
+When you use utf-8.decode(datagram.data);
+It turns the list of numbers into a json, i.e.:
+
+- {"deviceName": "Jimmy-PC", "ipAddress": "192.168.1.15", "status": "available"}
+
+jsonDecode then changes that JSON into a Dart Map
+
+```
+final decoded = jsonDecode(message); // Map<String, dynamic>
+print(decoded['deviceName']); // "Jimmy-PC"
+```
