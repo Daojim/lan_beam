@@ -12,6 +12,18 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final transfer = appState.activeTransfer;
+      if (transfer != null &&
+          transfer.direction == TransferDirection.receiving &&
+          transfer.status == TransferStatus.idle) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => const IncomingRequestScreen(),
+          ),
+        );
+      }
+    });
 
     final selectedFile = appState.selectedFile;
 
