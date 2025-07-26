@@ -33,7 +33,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         }
       });
 
-      await _discovery.broadcastHello(
+      _discovery.startBroadcasting(
         appState.settings.localDeviceName,
         DeviceStatus.available.name,
       );

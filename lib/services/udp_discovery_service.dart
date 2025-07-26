@@ -2,10 +2,12 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../models/device.dart';
+import 'dart:async';
 
 class UdpDiscoveryService {
   static const int discoveryPort = 65000;
   static const Duration listenDuration = Duration(seconds: 10);
+  Timer? _broadcastTimer;
 
   RawDatagramSocket? _socket;
   bool _isListening = false;
@@ -70,9 +72,24 @@ class UdpDiscoveryService {
     socket.close();
   }
 
+  void startBroadcasting(String deviceName, String status) {
+    _broadcastTimer?.cancel(); // Avoid multiple timers
+
+    _broadcastTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      broadcastHello(deviceName, status);
+    });
+  }
+
+  void stopBroadcasting() {
+    _broadcastTimer?.cancel();
+    _broadcastTimer = null;
+  }
+
   void dispose() {
     _socket?.close();
     _socket = null;
     _isListening = false;
+
+    stopBroadcasting();
   }
 }
