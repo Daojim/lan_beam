@@ -3,8 +3,8 @@ import 'package:provider/provider.dart';
 import '../models/app_state.dart';
 import '../models/device.dart';
 import '../models/transfer_session.dart';
-import '../services/fake_discovery_service.dart';
 import './transfer_progress_screen.dart';
+import '../services/udp_discovery_service.dart';
 
 class DiscoveryScreen extends StatelessWidget {
   const DiscoveryScreen({super.key});
@@ -100,19 +100,31 @@ class DiscoveryScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () {
-                final nextDevice = FakeDiscoveryService.getNextDevice();
-                if (nextDevice != null) {
-                  appState.addDevice(nextDevice);
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('No more devices to discover.'),
-                    ),
+              onPressed: () async {
+                final discovery = UdpDiscoveryService();
+
+                // Start listening for incoming discovery responses
+                await discovery.startListening((device) {
+                  // Avoid duplicates by IP
+                  final alreadyExists = appState.discoveredDevices.any(
+                    (d) => d.ipAddress == device.ipAddress,
                   );
-                }
+                  if (!alreadyExists) {
+                    appState.addDevice(device);
+                  }
+                });
+
+                // Broadcast your device info
+                await discovery.broadcastHello(
+                  appState.settings.localDeviceName,
+                  DeviceStatus.available.name,
+                );
+
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('Broadcast sent')));
               },
-              child: const Text('Add Test Device'),
+              child: const Text('Broadcast Discovery'),
             ),
 
             const SizedBox(height: 8),
@@ -120,7 +132,6 @@ class DiscoveryScreen extends StatelessWidget {
             ElevatedButton(
               onPressed: () {
                 appState.discoveredDevices.clear();
-                FakeDiscoveryService.reset();
                 appState.notifyListeners();
               },
               child: const Text('Clear Devices'),
