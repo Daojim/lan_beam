@@ -16,13 +16,17 @@ class TcpFileSender {
   static const int transferPort = 65001;
 
   Future<void> sendFile(FileInfo file, Device receiver) async {
+    StreamQueue<String>? lineQueue;
+    Socket? socket;
+
     try {
-      final socket = await Socket.connect(receiver.ipAddress, transferPort);
+      socket = await Socket.connect(receiver.ipAddress, transferPort);
       if (kDebugMode) print("Connected to receiver at ${receiver.ipAddress}");
 
       // Buffer the socket stream to allow multiple reads
-      final lineQueue = StreamQueue<String>(
-        (socket as Stream<List<int>>)
+      lineQueue = StreamQueue<String>(
+        socket
+            .cast<List<int>>()
             .transform(utf8.decoder)
             .transform(const LineSplitter()),
       );
@@ -39,12 +43,18 @@ class TcpFileSender {
         "deviceName": deviceName,
       };
       socket.write(jsonEncode(metadata) + '\n');
+      await socket.flush();
 
-      // Step 1.5: Wait for receiver to accept
-      final response = await lineQueue.next;
+      // Step 1.5: Wait for receiver to accept (with timeout)
+      final response = await lineQueue.next.timeout(
+        const Duration(seconds: 30),
+        onTimeout: () => throw TimeoutException(
+          "Receiver did not respond within 30 seconds",
+        ),
+      );
+
       if (response != 'ACCEPTED') {
-        await socket.close();
-        throw Exception("Receiver rejected the transfer.");
+        throw Exception("Receiver rejected the transfer: $response");
       }
 
       // Step 2: Start transfer session
@@ -72,7 +82,7 @@ class TcpFileSender {
           socket.add(bytes);
           sent += bytes.length;
 
-          if (kDebugMode) {
+          if (kDebugMode && sent % (chunkSize * 25) == 0) {
             print("Sent $sent / $totalSize bytes");
           }
 
@@ -83,21 +93,26 @@ class TcpFileSender {
         }
       } catch (e) {
         if (kDebugMode) print("Error during file streaming: $e");
-        throw Exception("File streaming failed.");
+        throw Exception("File streaming failed: $e");
       } finally {
         raf.close();
       }
 
-      // Ensure all data is flushed before closing
+      // Ensure all data is flushed before waiting for final response
       await socket.flush();
 
-      // Step 4: Wait for receiver acknowledgment
-      final finalResponse = await lineQueue.next;
-      if (finalResponse != 'RECEIVED') {
-        throw Exception("Receiver did not confirm file receipt.");
-      }
+      // Step 4: Wait for receiver acknowledgment (with timeout)
+      final finalResponse = await lineQueue.next.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () =>
+            throw TimeoutException("Receiver did not confirm receipt"),
+      );
 
-      await socket.close();
+      if (finalResponse != 'RECEIVED') {
+        throw Exception(
+          "Receiver did not confirm file receipt: $finalResponse",
+        );
+      }
 
       appState.setActiveTransfer(
         appState.activeTransfer!.copyWith(
@@ -112,6 +127,15 @@ class TcpFileSender {
       appState.setActiveTransfer(
         appState.activeTransfer?.copyWith(status: TransferStatus.failed),
       );
+      rethrow;
+    } finally {
+      // Clean up resources
+      try {
+        await lineQueue?.cancel();
+        await socket?.close();
+      } catch (e) {
+        if (kDebugMode) print("Error during cleanup: $e");
+      }
     }
   }
 }

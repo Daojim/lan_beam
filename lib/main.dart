@@ -16,7 +16,7 @@ void main() {
     activeTransfer: null,
     settings: AppSettings(
       localDeviceName: 'MyDevice',
-      defaultSaveFolder: 'C:/Users/Jimmy/Downloads',
+      defaultSaveFolder: 'C:/Users/Jimmy/Desktop',
     ),
     isListening: false,
   );
