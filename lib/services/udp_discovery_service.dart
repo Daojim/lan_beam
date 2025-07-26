@@ -75,7 +75,7 @@ class UdpDiscoveryService {
   void startBroadcasting(String deviceName, String status) {
     _broadcastTimer?.cancel(); // Avoid multiple timers
 
-    _broadcastTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+    _broadcastTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       broadcastHello(deviceName, status);
     });
   }
