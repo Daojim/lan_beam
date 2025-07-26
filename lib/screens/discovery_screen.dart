@@ -5,6 +5,7 @@ import '../models/device.dart';
 import '../models/transfer_session.dart';
 import './transfer_progress_screen.dart';
 import '../services/udp_discovery_service.dart';
+import '../services/tcp_file_sender.dart';
 
 class DiscoveryScreen extends StatefulWidget {
   const DiscoveryScreen({super.key});
@@ -82,7 +83,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                                     appState.selectedFile == null ||
                                         device.status != DeviceStatus.available
                                     ? null
-                                    : () {
+                                    : () async {
+                                        // Start transfer session visually first
                                         appState.setActiveTransfer(
                                           TransferSession(
                                             direction:
@@ -94,13 +96,22 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                                           ),
                                         );
 
+                                        // Navigate to progress screen
                                         Navigator.of(context).push(
                                           MaterialPageRoute(
                                             builder: (context) =>
                                                 const TransferProgressScreen(),
                                           ),
                                         );
+
+                                        // Start sending file over TCP
+                                        final sender = TcpFileSender(appState);
+                                        await sender.sendFile(
+                                          appState.selectedFile!,
+                                          device,
+                                        );
                                       },
+
                                 child: const Text('Send'),
                               ),
                             ],
