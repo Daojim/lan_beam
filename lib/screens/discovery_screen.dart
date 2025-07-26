@@ -6,8 +6,45 @@ import '../models/transfer_session.dart';
 import './transfer_progress_screen.dart';
 import '../services/udp_discovery_service.dart';
 
-class DiscoveryScreen extends StatelessWidget {
+class DiscoveryScreen extends StatefulWidget {
   const DiscoveryScreen({super.key});
+
+  @override
+  State<DiscoveryScreen> createState() => _DiscoveryScreenState();
+}
+
+class _DiscoveryScreenState extends State<DiscoveryScreen> {
+  final UdpDiscoveryService _discovery = UdpDiscoveryService();
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Delay listening until after widget is built
+    Future.microtask(() async {
+      final appState = context.read<AppState>();
+
+      await _discovery.startListening((device) {
+        final alreadyExists = appState.discoveredDevices.any(
+          (d) => d.ipAddress == device.ipAddress,
+        );
+        if (!alreadyExists) {
+          appState.addDevice(device);
+        }
+      });
+
+      await _discovery.broadcastHello(
+        appState.settings.localDeviceName,
+        DeviceStatus.available.name,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _discovery.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,31 +83,6 @@ class DiscoveryScreen extends StatelessWidget {
                                         device.status != DeviceStatus.available
                                     ? null
                                     : () {
-                                        if (appState.selectedFile == null) {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                'Please pick a file first',
-                                              ),
-                                            ),
-                                          );
-                                          return;
-                                        }
-
-                                        if (device.status !=
-                                            DeviceStatus.available) {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text('Device is busy.'),
-                                            ),
-                                          );
-                                          return;
-                                        }
-
                                         appState.setActiveTransfer(
                                           TransferSession(
                                             direction:
@@ -89,7 +101,6 @@ class DiscoveryScreen extends StatelessWidget {
                                           ),
                                         );
                                       },
-
                                 child: const Text('Send'),
                               ),
                             ],
@@ -99,36 +110,6 @@ class DiscoveryScreen extends StatelessWidget {
                     ),
             ),
             const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () async {
-                final discovery = UdpDiscoveryService();
-
-                // Start listening for incoming discovery responses
-                await discovery.startListening((device) {
-                  // Avoid duplicates by IP
-                  final alreadyExists = appState.discoveredDevices.any(
-                    (d) => d.ipAddress == device.ipAddress,
-                  );
-                  if (!alreadyExists) {
-                    appState.addDevice(device);
-                  }
-                });
-
-                // Broadcast your device info
-                await discovery.broadcastHello(
-                  appState.settings.localDeviceName,
-                  DeviceStatus.available.name,
-                );
-
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text('Broadcast sent')));
-              },
-              child: const Text('Broadcast Discovery'),
-            ),
-
-            const SizedBox(height: 8),
-
             ElevatedButton(
               onPressed: () {
                 appState.discoveredDevices.clear();
