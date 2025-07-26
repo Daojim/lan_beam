@@ -21,72 +21,96 @@ class TcpFileReceiver {
       if (kDebugMode) print("TCP receiver listening on port $transferPort");
 
       _server!.listen((Socket client) async {
-        if (kDebugMode)
-          print("Incoming TCP connection from ${client.remoteAddress.address}");
+        try {
+          if (kDebugMode) print("Incoming TCP connection from ${client.remoteAddress.address}");
 
-        // Step 1: Receive metadata (JSON-encoded)
-        final metadataString = await _readLine(client);
-        final metadata = jsonDecode(metadataString);
+          // Step 1: Receive metadata (JSON-encoded)
+          final metadataString = await _readLine(client);
+          final metadata = jsonDecode(metadataString);
 
-        final fileInfo = FileInfo(
-          fileName: metadata['fileName'],
-          fileSizeBytes: metadata['fileSizeBytes'],
-          fileType: metadata['fileType'],
-          filePath: '', // Set when accepted
-        );
+          final fileInfo = FileInfo(
+            fileName: metadata['fileName'],
+            fileSizeBytes: metadata['fileSizeBytes'],
+            fileType: metadata['fileType'],
+            filePath: '', // Set when accepted
+          );
 
-        final peer = Device(
-          name: metadata['deviceName'] ?? 'Unknown Device',
-          ipAddress: client.remoteAddress.address,
-          status: DeviceStatus.available,
-        );
+          final peer = Device(
+            name: metadata['deviceName'] ?? 'Unknown Device',
+            ipAddress: client.remoteAddress.address,
+            status: DeviceStatus.available,
+          );
 
-        // Step 2: Show Incoming Request UI
-        appState.setActiveTransfer(
-          TransferSession(
-            direction: TransferDirection.receiving,
-            file: fileInfo,
-            progress: 0.0,
-            status: TransferStatus.idle,
-            peerDevice: peer,
-          ),
-        );
-
-        // Step 3: Wait for user to accept before continuing
-        while (appState.activeTransfer?.status != TransferStatus.transferring) {
-          await Future.delayed(const Duration(milliseconds: 100));
-        }
-
-        // Step 3.5: Send confirmation to sender
-        client.write('ACCEPTED\n');
-
-        // Step 4: Prepare save location
-        final savePath =
-            '${appState.settings.defaultSaveFolder}/${fileInfo.fileName}';
-        final file = File(savePath);
-        final sink = file.openWrite();
-
-        int received = 0;
-        await for (final chunk in client) {
-          sink.add(chunk);
-          received += chunk.length;
-
-          final progress = received / fileInfo.fileSizeBytes;
+          // Step 2: Show Incoming Request UI
           appState.setActiveTransfer(
-            appState.activeTransfer!.copyWith(progress: progress),
+            TransferSession(
+              direction: TransferDirection.receiving,
+              file: fileInfo,
+              progress: 0.0,
+              status: TransferStatus.idle,
+              peerDevice: peer,
+            ),
+          );
+
+          // Step 3: Wait for user to accept before continuing
+          while (appState.activeTransfer?.status != TransferStatus.transferring) {
+            await Future.delayed(const Duration(milliseconds: 100));
+          }
+
+          // Step 3.5: Send confirmation to sender
+          client.write('ACCEPTED\n');
+
+          // Step 4: Prepare save location
+          final savePath = '${appState.settings.defaultSaveFolder}/${fileInfo.fileName}';
+          final file = File(savePath);
+          final sink = file.openWrite();
+
+          int received = 0;
+          await for (final chunk in client) {
+            if (kDebugMode) print("Received chunk of size: ${chunk.length}");
+            sink.add(chunk);
+            received += chunk.length;
+
+            final progress = received / fileInfo.fileSizeBytes;
+            appState.setActiveTransfer(
+              appState.activeTransfer!.copyWith(progress: progress),
+            );
+          }
+
+          await sink.close();
+
+          // Verify file size
+          final actualFileSize = await file.length();
+          if (actualFileSize != fileInfo.fileSizeBytes) {
+            if (kDebugMode) print("File size mismatch: expected ${fileInfo.fileSizeBytes}, got $actualFileSize");
+            appState.setActiveTransfer(
+              appState.activeTransfer!.copyWith(
+                status: TransferStatus.failed,
+              ),
+            );
+          } else {
+            appState.setActiveTransfer(
+              appState.activeTransfer!.copyWith(
+                progress: 1.0,
+                status: TransferStatus.completed,
+              ),
+            );
+            if (kDebugMode) print("File received and saved to $savePath");
+          }
+
+          client.destroy();
+        } catch (e) {
+          if (kDebugMode) print("Error during file transfer: $e");
+          appState.setActiveTransfer(
+            appState.activeTransfer?.copyWith(status: TransferStatus.failed),
           );
         }
-
-        await sink.close();
-        appState.setActiveTransfer(
-          appState.activeTransfer!.copyWith(
-            progress: 1.0,
-            status: TransferStatus.completed,
-          ),
-        );
-
-        if (kDebugMode) print("File received and saved to $savePath");
-        client.destroy();
+      },
+      onError: (error) {
+        if (kDebugMode) print("Socket error: $error");
+      },
+      onDone: () {
+        if (kDebugMode) print("Socket connection closed");
       });
     } catch (e) {
       if (kDebugMode) print("Error starting TCP receiver: $e");

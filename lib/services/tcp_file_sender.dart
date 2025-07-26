@@ -34,7 +34,7 @@ class TcpFileSender {
     // Step 1.5: Wait for receiver to accept
     final response = await _readLine(socket);
     if (response != 'ACCEPTED') {
-      socket.close();
+      await socket.close();
       throw Exception("Receiver rejected the transfer.");
     }
 
@@ -60,6 +60,10 @@ class TcpFileSender {
       socket.add(bytes);
       sent += bytes.length;
 
+      if (kDebugMode) {
+        print("Sent $sent / $totalSize bytes");
+      }
+
       final progress = sent / totalSize;
       appState.setActiveTransfer(
         appState.activeTransfer!.copyWith(progress: progress),
@@ -67,7 +71,10 @@ class TcpFileSender {
     }
 
     raf.close();
-    socket.close();
+
+    // Ensure all data is flushed before closing
+    await socket.flush();
+    await socket.close();
 
     appState.setActiveTransfer(
       appState.activeTransfer!.copyWith(
