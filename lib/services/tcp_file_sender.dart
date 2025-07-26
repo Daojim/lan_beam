@@ -30,6 +30,13 @@ class TcpFileSender {
     };
     socket.write(jsonEncode(metadata) + '\n');
 
+    // Step 1.5: Wait for receiver to accept
+    final response = await _readLine(socket);
+    if (response != 'ACCEPTED') {
+      socket.close();
+      throw Exception("Receiver rejected the transfer.");
+    }
+
     // Step 2: Start transfer session
     appState.setActiveTransfer(
       TransferSession(
@@ -69,5 +76,20 @@ class TcpFileSender {
     );
 
     if (kDebugMode) print("File sent successfully.");
+  }
+
+  Future<String> _readLine(Socket socket) async {
+    final completer = Completer<String>();
+    final buffer = StringBuffer();
+
+    socket.listen((data) {
+      final chunk = utf8.decode(data);
+      buffer.write(chunk);
+      if (chunk.contains('\n')) {
+        completer.complete(buffer.toString().trim());
+      }
+    });
+
+    return completer.future;
   }
 }

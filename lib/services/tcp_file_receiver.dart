@@ -57,6 +57,9 @@ class TcpFileReceiver {
           await Future.delayed(const Duration(milliseconds: 100));
         }
 
+        // Step 3.5: Send confirmation to sender
+        client.write('ACCEPTED\n');
+
         // Step 4: Prepare save location
         final savePath =
             '${appState.settings.defaultSaveFolder}/${fileInfo.fileName}';
