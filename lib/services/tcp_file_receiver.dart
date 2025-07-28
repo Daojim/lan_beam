@@ -203,6 +203,14 @@ class TcpFileReceiver {
       // Wait for user to accept
       while (appState.activeTransfer?.status != TransferStatus.transferring) {
         await Future.delayed(const Duration(milliseconds: 100));
+        // Check if transfer was cancelled during acceptance wait
+        if (appState.activeTransfer?.status == TransferStatus.failed) {
+          client.write('REJECTED\n');
+          await client.flush();
+          client.destroy();
+          transferCompleter.complete();
+          return;
+        }
       }
 
       // Send acceptance confirmation
@@ -217,8 +225,16 @@ class TcpFileReceiver {
       final file = File(savePath);
       final sink = file.openWrite();
 
+      // Update transfer session with actual save path
+      appState.setActiveTransfer(
+        appState.activeTransfer!.copyWith(actualSavePath: savePath),
+      );
+
       int received = 0;
       int totalExpected = fileInfo.fileSizeBytes;
+      int lastProgressUpdate = 0;
+      const progressUpdateThreshold =
+          32768; // Update progress every 32KB to reduce UI lag
 
       // Process any file data that came with the metadata
       if (dataBuffer.length > metadataEndIndex + 1) {
@@ -231,12 +247,22 @@ class TcpFileReceiver {
           appState.activeTransfer!.copyWith(progress: progress),
         );
 
+        // Send progress update to sender
+        _sendProgressUpdate(client, progress);
+
         if (kDebugMode) print("Initial file data: $received bytes");
       }
 
       // Wait until we've received all data, checking the buffer periodically
       while (received < totalExpected) {
-        await Future.delayed(const Duration(milliseconds: 50));
+        // Check if transfer was cancelled
+        if (appState.activeTransfer?.status == TransferStatus.failed) {
+          break;
+        }
+
+        await Future.delayed(
+          const Duration(milliseconds: 25),
+        ); // Reduced delay for better responsiveness
 
         // Check if more data has arrived in the buffer
         if (dataBuffer.length > metadataEndIndex + 1) {
@@ -246,17 +272,42 @@ class TcpFileReceiver {
             sink.add(newData);
             received = allFileData.length;
 
-            final progress = received / totalExpected;
-            appState.setActiveTransfer(
-              appState.activeTransfer!.copyWith(progress: progress),
-            );
+            // Batch progress updates to reduce UI lag
+            if (received - lastProgressUpdate > progressUpdateThreshold ||
+                received == totalExpected) {
+              final progress = received / totalExpected;
+              appState.setActiveTransfer(
+                appState.activeTransfer!.copyWith(progress: progress),
+              );
 
-            if (kDebugMode) print("Progress: $received / $totalExpected bytes");
+              // Send progress update to sender
+              _sendProgressUpdate(client, progress);
+
+              lastProgressUpdate = received;
+
+              if (kDebugMode)
+                print("Progress: $received / $totalExpected bytes");
+            }
           }
         }
       }
 
       await sink.close();
+
+      // Check if transfer was cancelled
+      if (appState.activeTransfer?.status == TransferStatus.failed) {
+        // Clean up partial file
+        try {
+          await file.delete();
+        } catch (e) {
+          if (kDebugMode) print("Could not delete partial file: $e");
+        }
+        client.write('CANCELLED\n');
+        await client.flush();
+        client.destroy();
+        transferCompleter.complete();
+        return;
+      }
 
       // Verify file size
       final actualFileSize = await file.length();
@@ -286,7 +337,8 @@ class TcpFileReceiver {
         );
         if (kDebugMode) print("File received and saved to $savePath");
 
-        // Send final acknowledgment
+        // Send final progress update and acknowledgment
+        _sendProgressUpdate(client, 1.0);
         client.write('RECEIVED\n');
         await client.flush();
       }
@@ -302,6 +354,14 @@ class TcpFileReceiver {
       if (!transferCompleter.isCompleted) {
         transferCompleter.completeError(e);
       }
+    }
+  }
+
+  void _sendProgressUpdate(Socket client, double progress) {
+    try {
+      client.write('PROGRESS:${progress.toStringAsFixed(3)}\n');
+    } catch (e) {
+      if (kDebugMode) print("Could not send progress update: $e");
     }
   }
 

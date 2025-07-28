@@ -157,12 +157,15 @@ class TransferProgressScreen extends StatelessWidget {
 
   void _handleDoneAction(BuildContext context, AppState appState) {
     _clearState(appState);
-    Navigator.of(context).pop();
+    // Navigate back to home screen, clearing all intermediate screens
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   void _cleanupPartialFile(TransferSession session, AppState appState) {
     try {
+      // Use actual save path if available (from collision handling), otherwise fallback to default
       final savePath =
+          session.actualSavePath ??
           '${appState.settings.defaultSaveFolder}/${session.file.fileName}';
       final file = File(savePath);
       if (file.existsSync()) {

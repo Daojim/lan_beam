@@ -70,13 +70,18 @@ class TcpFileSender {
         ),
       );
 
-      // Step 3: Stream file bytes
+      // Step 3: Stream file bytes with dynamic chunk size
       int sent = 0;
-      final chunkSize = 4096;
+      final chunkSize = _getOptimalChunkSize(totalSize);
       final raf = fileToSend.openSync();
 
       try {
         while (sent < totalSize) {
+          // Check if transfer was cancelled
+          if (appState.activeTransfer?.status == TransferStatus.failed) {
+            break;
+          }
+
           final remaining = totalSize - sent;
           final bytes = raf.readSync(
             remaining < chunkSize ? remaining : chunkSize,
@@ -84,13 +89,15 @@ class TcpFileSender {
           socket.add(bytes);
           sent += bytes.length;
 
-          if (kDebugMode && sent % (chunkSize * 25) == 0) {
+          if (kDebugMode && sent % (chunkSize * 10) == 0) {
             print("Sent $sent / $totalSize bytes");
           }
 
-          final progress = sent / totalSize;
+          // Don't update progress on sender side - wait for receiver updates
+          // Keep progress at a reasonable level to show activity without claiming completion
+          final sendProgress = (sent / totalSize * 0.95).clamp(0.0, 0.95);
           appState.setActiveTransfer(
-            appState.activeTransfer!.copyWith(progress: progress),
+            appState.activeTransfer!.copyWith(progress: sendProgress),
           );
         }
       } catch (e) {
@@ -100,30 +107,55 @@ class TcpFileSender {
         raf.close();
       }
 
+      // Check if transfer was cancelled
+      if (appState.activeTransfer?.status == TransferStatus.failed) {
+        socket.write('CANCELLED\n');
+        await socket.flush();
+        socket.destroy();
+        return;
+      }
+
       // Ensure all data is flushed before waiting for final response
       await socket.flush();
 
-      // Step 4: Wait for receiver acknowledgment (with timeout)
-      final finalResponse = await lineQueue.next.timeout(
-        const Duration(seconds: 10),
-        onTimeout: () =>
-            throw TimeoutException("Receiver did not confirm receipt"),
-      );
+      // Step 4: Listen for progress updates and final response
+      while (true) {
+        try {
+          final response = await lineQueue.next.timeout(
+            const Duration(seconds: 30),
+            onTimeout: () => throw TimeoutException(
+              "Receiver did not respond within 30 seconds",
+            ),
+          );
 
-      if (finalResponse != 'RECEIVED') {
-        throw Exception(
-          "Receiver did not confirm file receipt: $finalResponse",
-        );
+          if (response.startsWith('PROGRESS:')) {
+            // Update sender progress based on receiver progress
+            final progressStr = response.substring(9);
+            final receiverProgress = double.tryParse(progressStr) ?? 0.0;
+            appState.setActiveTransfer(
+              appState.activeTransfer!.copyWith(progress: receiverProgress),
+            );
+          } else if (response == 'RECEIVED') {
+            // Transfer completed successfully
+            appState.setActiveTransfer(
+              appState.activeTransfer!.copyWith(
+                status: TransferStatus.completed,
+                progress: 1.0,
+              ),
+            );
+            if (kDebugMode) print("File sent successfully.");
+            break;
+          } else if (response == 'FAILED' || response == 'CANCELLED') {
+            throw Exception("Transfer failed or was cancelled by receiver");
+          }
+        } catch (e) {
+          if (e is TimeoutException) {
+            throw e;
+          }
+          // Other errors might be connection issues
+          break;
+        }
       }
-
-      appState.setActiveTransfer(
-        appState.activeTransfer!.copyWith(
-          status: TransferStatus.completed,
-          progress: 1.0,
-        ),
-      );
-
-      if (kDebugMode) print("File sent successfully.");
     } catch (e) {
       if (kDebugMode) print("Error during file transfer: $e");
       appState.setActiveTransfer(
@@ -138,6 +170,22 @@ class TcpFileSender {
       } catch (e) {
         if (kDebugMode) print("Error during cleanup: $e");
       }
+    }
+  }
+
+  /// Determines optimal chunk size based on file size for better performance
+  int _getOptimalChunkSize(int fileSize) {
+    const mb = 1024 * 1024;
+    const gb = 1024 * mb;
+
+    if (fileSize < 10 * mb) {
+      return 4096; // 4KB for small files
+    } else if (fileSize < 100 * mb) {
+      return 65536; // 64KB for medium files
+    } else if (fileSize < gb) {
+      return 524288; // 512KB for large files
+    } else {
+      return 2097152; // 2MB for very large files
     }
   }
 }
