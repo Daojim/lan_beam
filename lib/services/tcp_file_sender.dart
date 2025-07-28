@@ -7,20 +7,22 @@ import '../models/file_info.dart';
 import '../models/device.dart';
 import '../models/app_state.dart';
 import '../models/transfer_session.dart';
+import '../utils/constants.dart';
 
 class TcpFileSender {
   final AppState appState;
 
   TcpFileSender(this.appState);
 
-  static const int transferPort = 65001;
-
   Future<void> sendFile(FileInfo file, Device receiver) async {
     StreamQueue<String>? lineQueue;
     Socket? socket;
 
     try {
-      socket = await Socket.connect(receiver.ipAddress, transferPort);
+      socket = await Socket.connect(
+        receiver.ipAddress,
+        AppConstants.transferPort,
+      );
       if (kDebugMode) print("Connected to receiver at ${receiver.ipAddress}");
 
       // Buffer the socket stream to allow multiple reads

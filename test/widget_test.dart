@@ -9,12 +9,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
-import 'package:lan_beam/main.dart';
 import 'package:lan_beam/models/app_state.dart';
 import 'package:lan_beam/models/app_settings.dart';
+import 'package:lan_beam/screens/main_screen.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+  testWidgets('LAN Beam main screen loads correctly', (
+    WidgetTester tester,
+  ) async {
     // Create a test app state
     final testAppState = AppState(
       discoveredDevices: [],
@@ -30,22 +32,47 @@ void main() {
 
     // Build our app and trigger a frame.
     await tester.pumpWidget(
-      ChangeNotifierProvider(
-        create: (_) => testAppState,
-        child: LanBeamApp(appState: testAppState),
+      MaterialApp(
+        home: ChangeNotifierProvider(
+          create: (_) => testAppState,
+          child: const MainScreen(),
+        ),
       ),
     );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // Allow the app to initialize
+    await tester.pumpAndSettle();
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    // Verify that key elements are present
+    expect(find.text('Device Information'), findsOneWidget);
+    expect(find.text('File Selection'), findsOneWidget);
+    expect(find.text('No file selected.'), findsOneWidget);
+    expect(find.text('Choose File'), findsOneWidget);
+  });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  testWidgets('AppState manages file selection correctly', (
+    WidgetTester tester,
+  ) async {
+    // Create a test app state
+    final testAppState = AppState(
+      discoveredDevices: [],
+      selectedFile: null,
+      activeTransfer: null,
+      settings: AppSettings(
+        localDeviceName: 'Test Device',
+        defaultSaveFolder: 'Desktop',
+        showMyDeviceForTesting: false,
+      ),
+      isListening: false,
+    );
+
+    // Test that initially no file is selected
+    expect(testAppState.selectedFile, isNull);
+
+    // Test that device name is correctly set
+    expect(testAppState.settings.localDeviceName, equals('Test Device'));
+
+    // Test device filtering setting
+    expect(testAppState.settings.showMyDeviceForTesting, isFalse);
   });
 }

@@ -4,22 +4,22 @@ import 'package:provider/provider.dart';
 import 'models/app_state.dart';
 import 'models/app_settings.dart';
 import 'screens/main_screen.dart';
-import 'services/tcp_file_receiver.dart';
 import 'services/udp_discovery_service.dart';
 import 'models/device.dart';
+import 'utils/service_locator.dart';
 
-// Create global access to services
-late TcpFileReceiver tcpFileReceiver;
-late UdpDiscoveryService udpDiscoveryService;
-
-// Initialize auto-discovery services
+// Initialize auto-discovery services using service locator
 Future<void> initializeServices(AppState appState) async {
   try {
-    // Initialize UDP discovery service
-    udpDiscoveryService = UdpDiscoveryService();
+    // Initialize services through service locator
+    await ServiceLocator.instance.initializeServices(appState);
+
+    // Get UDP discovery service from service locator
+    final udpDiscoveryService = ServiceLocator.instance
+        .get<UdpDiscoveryService>();
 
     // Start listening for other devices
-    await udpDiscoveryService.startListening((device) {
+    final listenResult = await udpDiscoveryService.startListening((device) {
       final alreadyExists = appState.discoveredDevices.any(
         (d) => d.ipAddress == device.ipAddress,
       );
@@ -28,14 +28,18 @@ Future<void> initializeServices(AppState appState) async {
       }
     });
 
+    if (listenResult.isFailure) {
+      print('Failed to start UDP listener: ${listenResult.error}');
+      return;
+    }
+
     // Start broadcasting this device
     udpDiscoveryService.startBroadcasting(
       appState.settings.localDeviceName,
       DeviceStatus.available.name,
     );
 
-    // Auto-start TCP file receiver
-    tcpFileReceiver.startListening();
+    // TCP receiver is already started by service locator
     appState.setListening(true);
 
     print('Auto-discovery services started successfully');
@@ -128,7 +132,7 @@ String generateDeviceName() {
 }
 
 void main() {
-  // Initialize AppState first so you can pass it to TcpFileReceiver
+  // Initialize AppState first
   final initialState = AppState(
     discoveredDevices: [],
     selectedFile: null,
@@ -140,9 +144,6 @@ void main() {
     ),
     isListening: false,
   );
-
-  // Initialize the TCP receiver with that app state
-  tcpFileReceiver = TcpFileReceiver(initialState);
 
   runApp(
     ChangeNotifierProvider(

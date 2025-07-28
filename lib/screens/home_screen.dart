@@ -119,16 +119,36 @@ class HomeScreen extends StatelessWidget {
                           if (result != null && result.files.isNotEmpty) {
                             final pickedFile = result.files.first;
 
-                            appState.setSelectedFile(
-                              FileInfo(
-                                fileName: pickedFile.name,
-                                fileSizeBytes: pickedFile.size,
-                                fileType: pickedFile.extension != null
-                                    ? '.${pickedFile.extension}'
-                                    : '',
-                                filePath: pickedFile.path ?? '',
-                              ),
+                            final fileInfoResult = FileInfo.create(
+                              fileName: pickedFile.name,
+                              fileSizeBytes: pickedFile.size,
+                              fileType: pickedFile.extension != null
+                                  ? '.${pickedFile.extension}'
+                                  : '',
+                              filePath: pickedFile.path ?? '',
                             );
+
+                            if (fileInfoResult.isSuccess) {
+                              appState.setSelectedFile(fileInfoResult.value);
+                            } else {
+                              // Show error dialog
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('Invalid File'),
+                                  content: Text(
+                                    fileInfoResult.error ?? 'Unknown error',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(),
+                                      child: const Text('OK'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
                           } else {
                             // Non-intrusive dialog instead of SnackBar
                             showDialog(

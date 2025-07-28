@@ -6,19 +6,22 @@ import '../models/device.dart';
 import '../models/file_info.dart';
 import '../models/transfer_session.dart';
 import '../models/app_state.dart';
+import '../utils/constants.dart';
 
 class TcpFileReceiver {
   final AppState appState;
   ServerSocket? _server;
 
-  static const int transferPort = 65001;
-
   TcpFileReceiver(this.appState);
 
   Future<void> startListening() async {
     try {
-      _server = await ServerSocket.bind(InternetAddress.anyIPv4, transferPort);
-      if (kDebugMode) print("TCP receiver listening on port $transferPort");
+      _server = await ServerSocket.bind(
+        InternetAddress.anyIPv4,
+        AppConstants.transferPort,
+      );
+      if (kDebugMode)
+        print("TCP receiver listening on port ${AppConstants.transferPort}");
 
       _server!.listen(
         (Socket client) async {
@@ -66,12 +69,21 @@ class TcpFileReceiver {
                       try {
                         final metadata = jsonDecode(metadataString);
 
-                        fileInfo = FileInfo(
+                        final fileInfoResult = FileInfo.create(
                           fileName: metadata['fileName'],
                           fileSizeBytes: metadata['fileSizeBytes'],
                           fileType: metadata['fileType'],
                           filePath: '', // Set when accepted
                         );
+
+                        if (fileInfoResult.isFailure) {
+                          if (kDebugMode)
+                            print('Invalid file info: ${fileInfoResult.error}');
+                          client.close();
+                          return;
+                        }
+
+                        fileInfo = fileInfoResult.value;
 
                         peer = Device(
                           name: metadata['deviceName'] ?? 'Unknown Device',

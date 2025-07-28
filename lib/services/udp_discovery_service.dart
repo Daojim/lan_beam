@@ -2,80 +2,106 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../models/device.dart';
+import '../utils/result.dart';
+import '../utils/constants.dart';
 import 'dart:async';
 
 class UdpDiscoveryService {
-  static const int discoveryPort = 65000;
-  static const Duration listenDuration = Duration(seconds: 10);
   Timer? _broadcastTimer;
 
   RawDatagramSocket? _socket;
   bool _isListening = false;
 
-  Future<void> startListening(Function(Device) onDeviceDiscovered) async {
-    if (_isListening) return;
-    _isListening = true;
+  Future<Result<void>> startListening(
+    Function(Device) onDeviceDiscovered,
+  ) async {
+    if (_isListening) return const Result.success(null);
 
-    _socket = await RawDatagramSocket.bind(
-      InternetAddress.anyIPv4,
-      discoveryPort,
-    );
-    _socket!.broadcastEnabled = true;
+    try {
+      _isListening = true;
 
-    _socket!.listen((RawSocketEvent event) {
-      if (event == RawSocketEvent.read) {
-        final datagram = _socket!.receive();
-        if (datagram == null) return;
+      _socket = await RawDatagramSocket.bind(
+        InternetAddress.anyIPv4,
+        AppConstants.discoveryPort,
+      );
+      _socket!.broadcastEnabled = true;
 
-        try {
-          final message = utf8.decode(datagram.data);
-          final decoded = jsonDecode(message);
+      _socket!.listen((RawSocketEvent event) {
+        if (event == RawSocketEvent.read) {
+          final datagram = _socket!.receive();
+          if (datagram == null) return;
 
-          final device = Device(
-            name: decoded['deviceName'],
-            ipAddress: decoded['ipAddress'],
-            status: decoded['status'] == 'available'
-                ? DeviceStatus.available
-                : DeviceStatus.busy,
-          );
+          try {
+            final message = utf8.decode(datagram.data);
+            final decoded = jsonDecode(message);
 
-          onDeviceDiscovered(device);
-        } catch (e) {
-          if (kDebugMode) print("Failed to parse discovery packet: $e");
+            final device = Device(
+              name: decoded['deviceName'],
+              ipAddress: decoded['ipAddress'],
+              status: decoded['status'] == 'available'
+                  ? DeviceStatus.available
+                  : DeviceStatus.busy,
+            );
+
+            onDeviceDiscovered(device);
+          } catch (e) {
+            if (kDebugMode) print("Failed to parse discovery packet: $e");
+          }
         }
-      }
-    });
+      });
+
+      return const Result.success(null);
+    } catch (e) {
+      _isListening = false;
+      return Result.failure(
+        'Failed to start UDP discovery listener: $e',
+        e is Exception ? e : Exception(e.toString()),
+      );
+    }
   }
 
-  Future<void> broadcastHello(String deviceName, String status) async {
-    final interfaces = await NetworkInterface.list(
-      type: InternetAddressType.IPv4,
-    );
-    final ip = interfaces
-        .expand((i) => i.addresses)
-        .firstWhere((a) => a.type == InternetAddressType.IPv4 && !a.isLoopback)
-        .address;
+  Future<Result<void>> broadcastHello(String deviceName, String status) async {
+    try {
+      final interfaces = await NetworkInterface.list(
+        type: InternetAddressType.IPv4,
+      );
+      final ip = interfaces
+          .expand((i) => i.addresses)
+          .firstWhere(
+            (a) => a.type == InternetAddressType.IPv4 && !a.isLoopback,
+          )
+          .address;
 
-    final message = jsonEncode({
-      'deviceName': deviceName,
-      'ipAddress': ip,
-      'status': status,
-    });
+      final message = jsonEncode({
+        'deviceName': deviceName,
+        'ipAddress': ip,
+        'status': status,
+      });
 
-    final socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
-    socket.broadcastEnabled = true;
-    socket.send(
-      utf8.encode(message),
-      InternetAddress('255.255.255.255'),
-      discoveryPort,
-    );
-    socket.close();
+      final socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
+      socket.broadcastEnabled = true;
+      socket.send(
+        utf8.encode(message),
+        InternetAddress(AppConstants.broadcastAddress),
+        AppConstants.discoveryPort,
+      );
+      socket.close();
+
+      return const Result.success(null);
+    } catch (e) {
+      return Result.failure(
+        'Failed to broadcast discovery message: $e',
+        e is Exception ? e : Exception(e.toString()),
+      );
+    }
   }
 
   void startBroadcasting(String deviceName, String status) {
     _broadcastTimer?.cancel(); // Avoid multiple timers
 
-    _broadcastTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+    _broadcastTimer = Timer.periodic(AppConstants.discoveryBroadcastInterval, (
+      _,
+    ) {
       broadcastHello(deviceName, status);
     });
   }
