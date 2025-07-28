@@ -30,26 +30,28 @@ class HomeScreen extends StatelessWidget {
 
     final selectedFile = appState.selectedFile;
 
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Device Info Section (cleaned up)
-            _buildInfoCard(
-              context,
-              title: 'Device Information',
-              children: [
-                Text('Device Name: ${appState.settings.localDeviceName}'),
-                const SizedBox(height: 8),
-                Text('Save Folder: ${appState.settings.defaultSaveFolder}'),
-              ],
-            ),
+    return Column(
+      children: [
+        // Fixed top sections (non-scrollable)
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Device Info Section (fixed at top)
+              _buildInfoCard(
+                context,
+                title: 'Device Information',
+                children: [
+                  Text('Device Name: ${appState.settings.localDeviceName}'),
+                  const SizedBox(height: 8),
+                  Text('Save Folder: ${appState.settings.defaultSaveFolder}'),
+                ],
+              ),
 
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-            // File Selection Section
+              // File Selection Section (fixed at top)
             _buildInfoCard(
               context,
               title: 'File Selection',
@@ -160,73 +162,88 @@ class HomeScreen extends StatelessWidget {
                 ),
               ],
             ),
+            ],
+          ),
+        ),
 
-            // Device Selection Section (shows when file is selected)
-            if (selectedFile != null) ...[
-              const SizedBox(height: 24),
-              _buildInfoCard(
+        // Scrollable device list section
+        if (selectedFile != null) ...[
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: _buildInfoCard(
                 context,
                 title: 'Send to Device',
-              children: [
-                if (_getFilteredDevices(appState).isEmpty) ...[
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.search, color: Colors.orange),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Searching for devices...\nMake sure other devices have LAN Beam open.',
-                            style: TextStyle(color: Colors.orange.shade700),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ] else ...[
-                  ..._getFilteredDevices(appState).map(
-                    (device) => Container(
-                      margin: const EdgeInsets.only(bottom: 8),
+                children: [
+                  if (_getFilteredDevices(appState).isEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
+                        color: Colors.orange.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Colors.orange.withOpacity(0.3),
+                        ),
                       ),
-                      child: ListTile(
-                        leading: Icon(
-                          Icons.devices,
-                          color: device.status == DeviceStatus.available
-                              ? Colors.green
-                              : Colors.grey,
-                        ),
-                        title: Text(device.name),
-                        subtitle: Text(device.ipAddress),
-                        trailing: ElevatedButton.icon(
-                          onPressed: device.status == DeviceStatus.available
-                              ? () => _sendFileToDevice(
-                                    context,
-                                    appState,
-                                    device,
-                                  )
-                              : null,
-                          icon: const Icon(Icons.send),
-                          label: const Text('Send'),
-                        ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.search, color: Colors.orange),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Searching for devices...\nMake sure other devices have LAN Beam open.',
+                              style: TextStyle(color: Colors.orange.shade700),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
+                  ] else ...[
+                    // Make device list scrollable with fixed height
+                    SizedBox(
+                      height: 300, // Fixed height for device list
+                      child: ListView.builder(
+                        itemCount: _getFilteredDevices(appState).length,
+                        itemBuilder: (context, index) {
+                          final device = _getFilteredDevices(appState)[index];
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: ListTile(
+                              leading: Icon(
+                                Icons.devices,
+                                color: device.status == DeviceStatus.available
+                                    ? Colors.green
+                                    : Colors.grey,
+                              ),
+                              title: Text(device.name),
+                              subtitle: Text(device.ipAddress),
+                              trailing: ElevatedButton.icon(
+                                onPressed: device.status == DeviceStatus.available
+                                    ? () => _sendFileToDevice(
+                                          context,
+                                          appState,
+                                          device,
+                                        )
+                                    : null,
+                                icon: const Icon(Icons.send),
+                                label: const Text('Send'),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-            ],
-          ],
-        ),
-      ),
+          ),
+        ],
+      ],
     );
   }
 
