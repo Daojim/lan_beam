@@ -30,237 +30,239 @@ class HomeScreen extends StatelessWidget {
 
     final selectedFile = appState.selectedFile;
 
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Device Info Section
-          _buildInfoCard(
-            context,
-            title: 'Device Information',
-            children: [
-              Text('Device Name: ${appState.settings.localDeviceName}'),
-              const SizedBox(height: 8),
-              Text('Save Folder: ${appState.settings.defaultSaveFolder}'),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
-          // Test Mode Button
-          Align(
-            alignment: Alignment.centerRight,
-            child: ElevatedButton.icon(
-              onPressed: appState.selectedFile != null
-                  ? () {
-                      // Create a fake sending TransferSession to simulate an incoming request
-                      appState.setActiveTransfer(
-                        TransferSession(
-                          direction: TransferDirection.sending,
-                          file: appState.selectedFile!,
-                          progress: 0.0,
-                          status: TransferStatus.idle,
-                          peerDevice: Device(
-                            name: 'TestSender-PC',
-                            ipAddress: '192.168.1.99',
-                            status: DeviceStatus.available,
-                          ),
-                        ),
-                      );
-
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const IncomingRequestScreen(),
-                        ),
-                      );
-                    }
-                  : null,
-              icon: const Icon(Icons.bug_report),
-              label: const Text('Test Mode'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: appState.selectedFile != null ? null : Colors.grey.shade300,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          // File Selection Section
-          _buildInfoCard(
-            context,
-            title: 'File Selection',
-            children: [
-              if (selectedFile == null) ...[
-                const Text(
-                  'No file selected.',
-                  style: TextStyle(color: Colors.grey),
-                ),
-                const SizedBox(height: 12),
-              ] else ...[
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.insert_drive_file, color: Colors.blue),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              selectedFile.fileName,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              '${selectedFile.formattedSize} • ${selectedFile.fileType}',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () => appState.setSelectedFile(null),
-                        icon: const Icon(Icons.close, color: Colors.red),
-                        tooltip: 'Remove file',
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Device Info Section (cleaned up)
+            _buildInfoCard(
+              context,
+              title: 'Device Information',
+              children: [
+                Text('Device Name: ${appState.settings.localDeviceName}'),
+                const SizedBox(height: 8),
+                Text('Save Folder: ${appState.settings.defaultSaveFolder}'),
               ],
+            ),
 
-              // File picker buttons
-              Row(
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: () async {
-                      FilePickerResult? result = await FilePicker.platform
-                          .pickFiles();
+            const SizedBox(height: 16),
 
-                      if (result != null && result.files.isNotEmpty) {
-                        final pickedFile = result.files.first;
-
-                        appState.setSelectedFile(
-                          FileInfo(
-                            fileName: pickedFile.name,
-                            fileSizeBytes: pickedFile.size,
-                            fileType: pickedFile.extension != null
-                                ? '.${pickedFile.extension}'
-                                : '',
-                            filePath: pickedFile.path ?? '',
+            // Test Mode Button (disabled when no file selected)
+            Align(
+              alignment: Alignment.centerRight,
+              child: ElevatedButton.icon(
+                onPressed: appState.selectedFile != null
+                    ? () {
+                        // Create a fake sending TransferSession to simulate an incoming request
+                        appState.setActiveTransfer(
+                          TransferSession(
+                            direction: TransferDirection.sending,
+                            file: appState.selectedFile!,
+                            progress: 0.0,
+                            status: TransferStatus.idle,
+                            peerDevice: Device(
+                              name: 'TestSender-PC',
+                              ipAddress: '192.168.1.99',
+                              status: DeviceStatus.available,
+                            ),
                           ),
                         );
-                      } else {
-                        showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('No File Selected'),
-                            content: const Text('Please choose a file to continue.'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.of(context).pop(),
-                                child: const Text('OK'),
-                              ),
-                            ],
+
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const IncomingRequestScreen(),
                           ),
                         );
                       }
-                    },
-                    icon: const Icon(Icons.folder_open),
-                    label: Text(
-                      selectedFile == null ? 'Choose File' : 'Change File',
-                    ),
-                  ),
-                  if (selectedFile != null) ...[
-                    const SizedBox(width: 12),
-                    OutlinedButton.icon(
-                      onPressed: () => appState.setSelectedFile(null),
-                      icon: const Icon(Icons.clear),
-                      label: const Text('Clear'),
-                    ),
-                  ],
-                ],
+                    : null,
+                icon: const Icon(Icons.bug_report),
+                label: const Text('Test Mode'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: appState.selectedFile != null ? null : Colors.grey.shade300,
+                ),
               ),
-            ],
-          ),
+            ),
 
-          // Device Selection Section (shows when file is selected)
-          if (selectedFile != null) ...[
             const SizedBox(height: 24),
+
+            // File Selection Section
             _buildInfoCard(
               context,
-              title: 'Send to Device',
+              title: 'File Selection',
               children: [
-                if (appState.discoveredDevices.isEmpty) ...[
+                if (selectedFile == null) ...[
+                  const Text(
+                    'No file selected.',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 12),
+                ] else ...[
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.1),
+                      color: Colors.blue.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                      border: Border.all(color: Colors.blue.withOpacity(0.3)),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.search, color: Colors.orange),
+                        const Icon(Icons.insert_drive_file, color: Colors.blue),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: Text(
-                            'Searching for devices...\nMake sure other devices have LAN Beam open.',
-                            style: TextStyle(color: Colors.orange.shade700),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                selectedFile.fileName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                '${selectedFile.formattedSize} • ${selectedFile.fileType}',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
                           ),
+                        ),
+                        IconButton(
+                          onPressed: () => appState.setSelectedFile(null),
+                          icon: const Icon(Icons.close, color: Colors.red),
+                          tooltip: 'Remove file',
                         ),
                       ],
                     ),
                   ),
-                ] else ...[
-                  ...appState.discoveredDevices
-                      .map(
-                        (device) => Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade300),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: ListTile(
-                            leading: Icon(
-                              Icons.devices,
-                              color: device.status == DeviceStatus.available
-                                  ? Colors.green
-                                  : Colors.grey,
+                  const SizedBox(height: 12),
+                ],
+
+                // File picker buttons
+                Row(
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: () async {
+                        FilePickerResult? result = await FilePicker.platform
+                            .pickFiles();
+
+                        if (result != null && result.files.isNotEmpty) {
+                          final pickedFile = result.files.first;
+
+                          appState.setSelectedFile(
+                            FileInfo(
+                              fileName: pickedFile.name,
+                              fileSizeBytes: pickedFile.size,
+                              fileType: pickedFile.extension != null
+                                  ? '.${pickedFile.extension}'
+                                  : '',
+                              filePath: pickedFile.path ?? '',
                             ),
-                            title: Text(device.name),
-                            subtitle: Text(device.ipAddress),
-                            trailing: ElevatedButton.icon(
-                              onPressed: device.status == DeviceStatus.available
-                                  ? () => _sendFileToDevice(
-                                      context,
-                                      appState,
-                                      device,
-                                    )
-                                  : null,
-                              icon: const Icon(Icons.send),
-                              label: const Text('Send'),
+                          );
+                        } else {
+                          // Non-intrusive dialog instead of SnackBar
+                          showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('No File Selected'),
+                              content: const Text('Please choose a file to continue.'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  child: const Text('OK'),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.folder_open),
+                      label: Text(
+                        selectedFile == null ? 'Choose File' : 'Change File',
+                      ),
+                    ),
+                    if (selectedFile != null) ...[
+                      const SizedBox(width: 12),
+                      OutlinedButton.icon(
+                        onPressed: () => appState.setSelectedFile(null),
+                        icon: const Icon(Icons.clear),
+                        label: const Text('Clear'),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+
+            // Device Selection Section (shows when file is selected)
+            if (selectedFile != null) ...[
+              const SizedBox(height: 24),
+              _buildInfoCard(
+                context,
+                title: 'Send to Device',
+                children: [
+                  if (appState.discoveredDevices.isEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.search, color: Colors.orange),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Searching for devices...\nMake sure other devices have LAN Beam open.',
+                              style: TextStyle(color: Colors.orange.shade700),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else ...[
+                    ...appState.discoveredDevices
+                        .map(
+                          (device) => Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: ListTile(
+                              leading: Icon(
+                                Icons.devices,
+                                color: device.status == DeviceStatus.available
+                                    ? Colors.green
+                                    : Colors.grey,
+                              ),
+                              title: Text(device.name),
+                              subtitle: Text(device.ipAddress),
+                              trailing: ElevatedButton.icon(
+                                onPressed: device.status == DeviceStatus.available
+                                    ? () => _sendFileToDevice(
+                                        context,
+                                        appState,
+                                        device,
+                                      )
+                                    : null,
+                                icon: const Icon(Icons.send),
+                                label: const Text('Send'),
+                              ),
                             ),
                           ),
                         ),
-                      )
-                      .toList(),
+                  ],
                 ],
-              ],
-            ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
