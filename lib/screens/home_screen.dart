@@ -208,7 +208,7 @@ class HomeScreen extends StatelessWidget {
                 context,
                 title: 'Send to Device',
                 children: [
-                  if (appState.discoveredDevices.isEmpty) ...[
+                  if (_getFilteredDevices(appState).isEmpty) ...[
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -232,7 +232,7 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
                   ] else ...[
-                    ...appState.discoveredDevices.map(
+                    ..._getFilteredDevices(appState).map(
                       (device) => Container(
                         margin: const EdgeInsets.only(bottom: 8),
                         decoration: BoxDecoration(
@@ -298,6 +298,19 @@ class HomeScreen extends StatelessWidget {
     // Start sending file over TCP
     final sender = TcpFileSender(appState);
     await sender.sendFile(appState.selectedFile!, device);
+  }
+
+  // Filter out current device unless testing mode is enabled
+  List<Device> _getFilteredDevices(AppState appState) {
+    if (appState.settings.showMyDeviceForTesting) {
+      // Show all devices including current device
+      return appState.discoveredDevices;
+    } else {
+      // Filter out current device by name
+      return appState.discoveredDevices
+          .where((device) => device.name != appState.settings.localDeviceName)
+          .toList();
+    }
   }
 
   Widget _buildInfoCard(

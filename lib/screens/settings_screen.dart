@@ -38,6 +38,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final newSettings = AppSettings(
       localDeviceName: _deviceNameController.text,
       defaultSaveFolder: _saveFolderController.text,
+      showMyDeviceForTesting: appState.settings.showMyDeviceForTesting,
     );
     appState.updateSettings(newSettings);
     ScaffoldMessenger.of(
@@ -66,6 +67,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 labelText: 'Default Save Folder',
               ),
             ),
+            const SizedBox(height: 32),
+            
+            // Testing Section
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Testing Options',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SwitchListTile(
+                      title: const Text('Show my device in transfer list'),
+                      subtitle: const Text('Enable to test file transfers to yourself'),
+                      value: appState.settings.showMyDeviceForTesting,
+                      onChanged: (bool value) {
+                        final newSettings = AppSettings(
+                          localDeviceName: appState.settings.localDeviceName,
+                          defaultSaveFolder: appState.settings.defaultSaveFolder,
+                          showMyDeviceForTesting: value,
+                        );
+                        appState.updateSettings(newSettings);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            
             const SizedBox(height: 32),
             ElevatedButton(
               onPressed: _saveSettings,

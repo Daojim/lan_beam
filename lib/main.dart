@@ -136,6 +136,7 @@ void main() {
     settings: AppSettings(
       localDeviceName: generateDeviceName(),
       defaultSaveFolder: getUserDesktopPath(),
+      showMyDeviceForTesting: false, // Default to false for production use
     ),
     isListening: false,
   );

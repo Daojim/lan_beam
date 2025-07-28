@@ -7,13 +7,34 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 
 import 'package:lan_beam/main.dart';
+import 'package:lan_beam/models/app_state.dart';
+import 'package:lan_beam/models/app_settings.dart';
 
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+    // Create a test app state
+    final testAppState = AppState(
+      discoveredDevices: [],
+      selectedFile: null,
+      activeTransfer: null,
+      settings: AppSettings(
+        localDeviceName: 'Test Device',
+        defaultSaveFolder: 'Desktop',
+        showMyDeviceForTesting: false,
+      ),
+      isListening: false,
+    );
+
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const LanBeamApp());
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (_) => testAppState,
+        child: LanBeamApp(appState: testAppState),
+      ),
+    );
 
     // Verify that our counter starts at 0.
     expect(find.text('0'), findsOneWidget);
