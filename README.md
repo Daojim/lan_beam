@@ -143,9 +143,8 @@ flutter build windows
 We welcome contributions! Here's how you can help:
 
 1. **🐛 Bug Reports** - Found an issue? [Open an issue](https://github.com/Daojim/lan_beam/issues)
-2. **💡 Feature Requests** - Have an idea? [Start a discussion](https://github.com/Daojim/lan_beam/discussions)
-3. **🔧 Code Contributions** - Fork, improve, and submit a PR
-4. **📖 Documentation** - Help improve docs and examples
+2. **🔧 Code Contributions** - Fork, improve, and submit a PR
+3. **📖 Documentation** - Help improve docs and examples
 
 ### Development Setup
 
@@ -169,5 +168,4 @@ flutter run -d windows
 ## 📞 Support
 
 - **Issues**: [GitHub Issues](https://github.com/Daojim/lan_beam/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/Daojim/lan_beam/discussions)
 - **Email**: [Contact Developer](mailto:daojim.dev@gmail.com)
