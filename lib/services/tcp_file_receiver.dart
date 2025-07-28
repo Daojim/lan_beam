@@ -8,9 +8,18 @@ import '../models/transfer_session.dart';
 import '../models/app_state.dart';
 import '../utils/constants.dart';
 
+class _TransferState {
+  IOSink? fileSink;
+  int receivedBytes = 0;
+  FileInfo? fileInfo;
+}
+
 class TcpFileReceiver {
   final AppState appState;
   ServerSocket? _server;
+
+  // Per-connection state for streaming transfers
+  final Map<Socket, _TransferState> _activeTransfers = {};
 
   TcpFileReceiver(this.appState);
 
@@ -31,12 +40,15 @@ class TcpFileReceiver {
                 "Incoming TCP connection from ${client.remoteAddress.address}",
               );
 
-            // Buffer for all incoming data - single subscription approach
+            // Buffer for incoming data - but limit size to prevent memory issues
             final dataBuffer = <int>[];
             bool metadataParsed = false;
             FileInfo? fileInfo;
             Device? peer;
             int metadataEndIndex = -1;
+
+            // For streaming file directly to disk
+            String? actualSavePath;
 
             // Create a completer to track when transfer is done
             final transferCompleter = Completer<void>();
@@ -45,10 +57,10 @@ class TcpFileReceiver {
             final socketSubscription = client.listen(
               (data) async {
                 try {
-                  dataBuffer.addAll(data);
-
-                  // Parse metadata if not done yet
                   if (!metadataParsed) {
+                    // Still parsing metadata
+                    dataBuffer.addAll(data);
+
                     // Look for newline to find end of metadata
                     for (int i = 0; i < dataBuffer.length; i++) {
                       if (dataBuffer[i] == 10) {
@@ -109,12 +121,23 @@ class TcpFileReceiver {
                             "Metadata parsed: ${fileInfo!.fileName}, ${fileInfo!.fileSizeBytes} bytes",
                           );
 
-                        // Start waiting for user acceptance in background
-                        _handleUserAcceptanceAndFileTransfer(
+                        // Prepare file for streaming
+                        actualSavePath = _generateUniqueFilePath(
+                          appState.settings.defaultSaveFolder,
+                          fileInfo!.fileName,
+                        );
+
+                        // Initialize transfer state for this connection
+                        _activeTransfers[client] = _TransferState()
+                          ..fileInfo = fileInfo;
+
+                        // Start handling file transfer in background
+                        _handleStreamingFileTransfer(
                           client,
                           dataBuffer,
                           metadataEndIndex,
                           fileInfo!,
+                          actualSavePath!,
                           transferCompleter,
                         );
                       } catch (e) {
@@ -126,12 +149,42 @@ class TcpFileReceiver {
                       }
                     }
                   } else {
-                    // Metadata already parsed, continue collecting file data
-                    // The file writing will be handled in _handleUserAcceptanceAndFileTransfer
-                    if (kDebugMode)
-                      print(
-                        "Received ${data.length} more bytes (total buffer: ${dataBuffer.length})",
-                      );
+                    // Metadata already parsed, stream file data directly to disk
+                    final transferState = _activeTransfers[client];
+                    if (transferState?.fileSink != null) {
+                      transferState!.fileSink!.add(data);
+                      transferState.receivedBytes += data.length;
+
+                      // Throttle progress updates to prevent UI flooding
+                      final progress =
+                          transferState.receivedBytes /
+                          transferState.fileInfo!.fileSizeBytes;
+                      if (transferState.receivedBytes % 131072 == 0 ||
+                          progress >= 1.0) {
+                        // Update every 128KB
+                        appState.setActiveTransfer(
+                          appState.activeTransfer!.copyWith(progress: progress),
+                        );
+                        _sendProgressUpdate(client, progress);
+
+                        // Check if transfer is complete
+                        if (progress >= 1.0) {
+                          await transferState.fileSink!.close();
+                          _activeTransfers.remove(client);
+
+                          appState.setActiveTransfer(
+                            appState.activeTransfer!.copyWith(
+                              status: TransferStatus.completed,
+                              progress: 1.0,
+                            ),
+                          );
+
+                          client.write('RECEIVED\n');
+                          await client.flush();
+                          transferCompleter.complete();
+                        }
+                      }
+                    }
                   }
                 } catch (e) {
                   if (kDebugMode) print("Error in data handler: $e");
@@ -192,11 +245,12 @@ class TcpFileReceiver {
     }
   }
 
-  Future<void> _handleUserAcceptanceAndFileTransfer(
+  Future<void> _handleStreamingFileTransfer(
     Socket client,
     List<int> dataBuffer,
     int metadataEndIndex,
     FileInfo fileInfo,
+    String savePath,
     Completer<void> transferCompleter,
   ) async {
     try {
@@ -217,140 +271,42 @@ class TcpFileReceiver {
       client.write('ACCEPTED\n');
       await client.flush();
 
-      // Prepare save location with collision handling
-      final savePath = _generateUniqueFilePath(
-        appState.settings.defaultSaveFolder,
-        fileInfo.fileName,
-      );
-      final file = File(savePath);
-      final sink = file.openWrite();
-
       // Update transfer session with actual save path
       appState.setActiveTransfer(
         appState.activeTransfer!.copyWith(actualSavePath: savePath),
       );
 
-      int received = 0;
-      int totalExpected = fileInfo.fileSizeBytes;
-      int lastProgressUpdate = 0;
-      const progressUpdateThreshold =
-          32768; // Update progress every 32KB to reduce UI lag
+      // Open file for writing
+      final file = File(savePath);
+      final transferState = _activeTransfers[client];
+      if (transferState != null) {
+        transferState.fileSink = file.openWrite();
+        transferState.receivedBytes = 0;
 
-      // Process any file data that came with the metadata
-      if (dataBuffer.length > metadataEndIndex + 1) {
-        final initialFileData = dataBuffer.sublist(metadataEndIndex + 1);
-        sink.add(initialFileData);
-        received = initialFileData.length;
-
-        final progress = received / totalExpected;
-        appState.setActiveTransfer(
-          appState.activeTransfer!.copyWith(progress: progress),
-        );
-
-        // Send progress update to sender
-        _sendProgressUpdate(client, progress);
-
-        if (kDebugMode) print("Initial file data: $received bytes");
-      }
-
-      // Wait until we've received all data, checking the buffer periodically
-      while (received < totalExpected) {
-        // Check if transfer was cancelled
-        if (appState.activeTransfer?.status == TransferStatus.failed) {
-          break;
-        }
-
-        await Future.delayed(
-          const Duration(milliseconds: 25),
-        ); // Reduced delay for better responsiveness
-
-        // Check if more data has arrived in the buffer
+        // Process any file data that came with the metadata
         if (dataBuffer.length > metadataEndIndex + 1) {
-          final allFileData = dataBuffer.sublist(metadataEndIndex + 1);
-          if (allFileData.length > received) {
-            final newData = allFileData.sublist(received);
-            sink.add(newData);
-            received = allFileData.length;
+          final initialFileData = dataBuffer.sublist(metadataEndIndex + 1);
+          transferState.fileSink!.add(initialFileData);
+          transferState.receivedBytes = initialFileData.length;
 
-            // Batch progress updates to reduce UI lag
-            if (received - lastProgressUpdate > progressUpdateThreshold ||
-                received == totalExpected) {
-              final progress = received / totalExpected;
-              appState.setActiveTransfer(
-                appState.activeTransfer!.copyWith(progress: progress),
-              );
-
-              // Send progress update to sender
-              _sendProgressUpdate(client, progress);
-
-              lastProgressUpdate = received;
-
-              if (kDebugMode)
-                print("Progress: $received / $totalExpected bytes");
-            }
-          }
-        }
-      }
-
-      await sink.close();
-
-      // Check if transfer was cancelled
-      if (appState.activeTransfer?.status == TransferStatus.failed) {
-        // Clean up partial file
-        try {
-          await file.delete();
-        } catch (e) {
-          if (kDebugMode) print("Could not delete partial file: $e");
-        }
-        client.write('CANCELLED\n');
-        await client.flush();
-        client.destroy();
-        transferCompleter.complete();
-        return;
-      }
-
-      // Verify file size
-      final actualFileSize = await file.length();
-      if (actualFileSize != fileInfo.fileSizeBytes) {
-        if (kDebugMode)
-          print(
-            "File size mismatch: expected ${fileInfo.fileSizeBytes}, got $actualFileSize",
+          final progress = transferState.receivedBytes / fileInfo.fileSizeBytes;
+          appState.setActiveTransfer(
+            appState.activeTransfer!.copyWith(progress: progress),
           );
+          _sendProgressUpdate(client, progress);
 
-        // Clean up partial file
-        try {
-          await file.delete();
-        } catch (e) {
-          if (kDebugMode) print("Could not delete partial file: $e");
+          if (kDebugMode)
+            print("Initial file data: ${transferState.receivedBytes} bytes");
         }
 
-        appState.setActiveTransfer(
-          appState.activeTransfer!.copyWith(status: TransferStatus.failed),
-        );
-        client.write('FAILED\n');
-      } else {
-        appState.setActiveTransfer(
-          appState.activeTransfer!.copyWith(
-            progress: 1.0,
-            status: TransferStatus.completed,
-          ),
-        );
-        if (kDebugMode) print("File received and saved to $savePath");
+        // Clear the buffer to free memory - streaming will handle the rest
+        dataBuffer.clear();
 
-        // Send final progress update and acknowledgment
-        _sendProgressUpdate(client, 1.0);
-        client.write('RECEIVED\n');
-        await client.flush();
-      }
-
-      await Future.delayed(const Duration(milliseconds: 100));
-      client.destroy();
-
-      if (!transferCompleter.isCompleted) {
-        transferCompleter.complete();
+        if (kDebugMode)
+          print("Streaming mode enabled for ${fileInfo.fileName}");
       }
     } catch (e) {
-      if (kDebugMode) print("Error in file transfer handler: $e");
+      if (kDebugMode) print("Error in streaming setup: $e");
       if (!transferCompleter.isCompleted) {
         transferCompleter.completeError(e);
       }

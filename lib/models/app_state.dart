@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'dart:async';
 import 'device.dart';
 import 'file_info.dart';
 import 'transfer_item.dart';
@@ -11,6 +12,10 @@ class AppState extends ChangeNotifier {
   TransferSession? activeTransfer;
   AppSettings settings;
   bool isListening;
+
+  // Debouncing for progress updates
+  Timer? _progressUpdateTimer;
+  TransferSession? _pendingProgressUpdate;
 
   AppState({
     required this.discoveredDevices,
@@ -67,8 +72,21 @@ class AppState extends ChangeNotifier {
   }
 
   void setActiveTransfer(TransferSession? session) {
-    activeTransfer = session;
-    notifyListeners();
+    if (session != null && session.status == TransferStatus.transferring) {
+      // Debounce progress updates during active transfers
+      _pendingProgressUpdate = session;
+      _progressUpdateTimer?.cancel();
+      _progressUpdateTimer = Timer(const Duration(milliseconds: 100), () {
+        activeTransfer = _pendingProgressUpdate;
+        notifyListeners();
+        _pendingProgressUpdate = null;
+      });
+    } else {
+      // Immediate updates for status changes
+      _progressUpdateTimer?.cancel();
+      activeTransfer = session;
+      notifyListeners();
+    }
   }
 
   void setListening(bool value) {
@@ -84,5 +102,11 @@ class AppState extends ChangeNotifier {
   void toggleListening() {
     isListening = !isListening;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _progressUpdateTimer?.cancel();
+    super.dispose();
   }
 }

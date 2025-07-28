@@ -70,7 +70,10 @@ class TcpFileSender {
         ),
       );
 
-      // Step 3: Stream file bytes with dynamic chunk size
+      // Step 3: Start listening for progress updates in parallel
+      _listenForProgressUpdates(lineQueue, appState);
+
+      // Stream file bytes with dynamic chunk size
       int sent = 0;
       final chunkSize = _getOptimalChunkSize(totalSize);
       final raf = fileToSend.openSync();
@@ -93,12 +96,13 @@ class TcpFileSender {
             print("Sent $sent / $totalSize bytes");
           }
 
-          // Don't update progress on sender side - wait for receiver updates
-          // Keep progress at a reasonable level to show activity without claiming completion
-          final sendProgress = (sent / totalSize * 0.95).clamp(0.0, 0.95);
-          appState.setActiveTransfer(
-            appState.activeTransfer!.copyWith(progress: sendProgress),
-          );
+          // Only update sender progress if we haven't received receiver updates
+          if (appState.activeTransfer?.progress == 0.0) {
+            final sendProgress = (sent / totalSize * 0.95).clamp(0.0, 0.95);
+            appState.setActiveTransfer(
+              appState.activeTransfer!.copyWith(progress: sendProgress),
+            );
+          }
         }
       } catch (e) {
         if (kDebugMode) print("Error during file streaming: $e");
@@ -118,43 +122,24 @@ class TcpFileSender {
       // Ensure all data is flushed before waiting for final response
       await socket.flush();
 
-      // Step 4: Listen for progress updates and final response
-      while (true) {
-        try {
-          final response = await lineQueue.next.timeout(
-            const Duration(seconds: 30),
-            onTimeout: () => throw TimeoutException(
-              "Receiver did not respond within 30 seconds",
-            ),
-          );
+      // Step 4: Wait for final response only
+      final finalResponse = await lineQueue.next.timeout(
+        const Duration(seconds: 30),
+        onTimeout: () =>
+            throw TimeoutException("Receiver did not confirm receipt"),
+      );
 
-          if (response.startsWith('PROGRESS:')) {
-            // Update sender progress based on receiver progress
-            final progressStr = response.substring(9);
-            final receiverProgress = double.tryParse(progressStr) ?? 0.0;
-            appState.setActiveTransfer(
-              appState.activeTransfer!.copyWith(progress: receiverProgress),
-            );
-          } else if (response == 'RECEIVED') {
-            // Transfer completed successfully
-            appState.setActiveTransfer(
-              appState.activeTransfer!.copyWith(
-                status: TransferStatus.completed,
-                progress: 1.0,
-              ),
-            );
-            if (kDebugMode) print("File sent successfully.");
-            break;
-          } else if (response == 'FAILED' || response == 'CANCELLED') {
-            throw Exception("Transfer failed or was cancelled by receiver");
-          }
-        } catch (e) {
-          if (e is TimeoutException) {
-            throw e;
-          }
-          // Other errors might be connection issues
-          break;
-        }
+      if (finalResponse == 'RECEIVED') {
+        // Transfer completed successfully
+        appState.setActiveTransfer(
+          appState.activeTransfer!.copyWith(
+            status: TransferStatus.completed,
+            progress: 1.0,
+          ),
+        );
+        if (kDebugMode) print("File sent successfully.");
+      } else if (finalResponse == 'FAILED' || finalResponse == 'CANCELLED') {
+        throw Exception("Transfer failed or was cancelled by receiver");
       }
     } catch (e) {
       if (kDebugMode) print("Error during file transfer: $e");
@@ -171,6 +156,33 @@ class TcpFileSender {
         if (kDebugMode) print("Error during cleanup: $e");
       }
     }
+  }
+
+  /// Listens for progress updates from receiver in parallel with sending
+  void _listenForProgressUpdates(
+    StreamQueue<String> lineQueue,
+    AppState appState,
+  ) {
+    // Listen for progress updates asynchronously
+    lineQueue.peek
+        .then((response) {
+          if (response.startsWith('PROGRESS:')) {
+            // Update sender progress based on receiver progress
+            final progressStr = response.substring(9);
+            final receiverProgress = double.tryParse(progressStr) ?? 0.0;
+            appState.setActiveTransfer(
+              appState.activeTransfer!.copyWith(progress: receiverProgress),
+            );
+            // Continue listening for more updates
+            lineQueue.next.then(
+              (_) => _listenForProgressUpdates(lineQueue, appState),
+            );
+          }
+        })
+        .catchError((e) {
+          // Ignore errors during progress listening
+          if (kDebugMode) print("Progress listening ended: $e");
+        });
   }
 
   /// Determines optimal chunk size based on file size for better performance
