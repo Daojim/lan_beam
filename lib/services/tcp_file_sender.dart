@@ -70,10 +70,7 @@ class TcpFileSender {
         ),
       );
 
-      // Step 3: Start listening for progress updates in parallel
-      _listenForProgressUpdates(lineQueue, appState);
-
-      // Stream file bytes with dynamic chunk size
+      // Step 3: Stream file bytes with dynamic chunk size
       int sent = 0;
       final chunkSize = _getOptimalChunkSize(totalSize);
       final raf = fileToSend.openSync();
@@ -122,24 +119,44 @@ class TcpFileSender {
       // Ensure all data is flushed before waiting for final response
       await socket.flush();
 
-      // Step 4: Wait for final response only
-      final finalResponse = await lineQueue.next.timeout(
-        const Duration(seconds: 30),
-        onTimeout: () =>
-            throw TimeoutException("Receiver did not confirm receipt"),
-      );
+      // Step 4: Listen for both progress updates and final response
+      bool transferComplete = false;
+      while (!transferComplete) {
+        try {
+          final response = await lineQueue.next.timeout(
+            const Duration(seconds: 30),
+            onTimeout: () => throw TimeoutException(
+              "Receiver did not respond within 30 seconds",
+            ),
+          );
 
-      if (finalResponse == 'RECEIVED') {
-        // Transfer completed successfully
-        appState.setActiveTransfer(
-          appState.activeTransfer!.copyWith(
-            status: TransferStatus.completed,
-            progress: 1.0,
-          ),
-        );
-        if (kDebugMode) print("File sent successfully.");
-      } else if (finalResponse == 'FAILED' || finalResponse == 'CANCELLED') {
-        throw Exception("Transfer failed or was cancelled by receiver");
+          if (response.startsWith('PROGRESS:')) {
+            // Update sender progress based on receiver progress
+            final progressStr = response.substring(9);
+            final receiverProgress = double.tryParse(progressStr) ?? 0.0;
+            appState.setActiveTransfer(
+              appState.activeTransfer!.copyWith(progress: receiverProgress),
+            );
+          } else if (response == 'RECEIVED') {
+            // Transfer completed successfully
+            appState.setActiveTransfer(
+              appState.activeTransfer!.copyWith(
+                status: TransferStatus.completed,
+                progress: 1.0,
+              ),
+            );
+            if (kDebugMode) print("File sent successfully.");
+            transferComplete = true;
+          } else if (response == 'FAILED' || response == 'CANCELLED') {
+            throw Exception("Transfer failed or was cancelled by receiver");
+          }
+        } catch (e) {
+          if (e is TimeoutException) {
+            throw e;
+          }
+          // Other errors might be connection issues
+          transferComplete = true;
+        }
       }
     } catch (e) {
       if (kDebugMode) print("Error during file transfer: $e");
@@ -156,33 +173,6 @@ class TcpFileSender {
         if (kDebugMode) print("Error during cleanup: $e");
       }
     }
-  }
-
-  /// Listens for progress updates from receiver in parallel with sending
-  void _listenForProgressUpdates(
-    StreamQueue<String> lineQueue,
-    AppState appState,
-  ) {
-    // Listen for progress updates asynchronously
-    lineQueue.peek
-        .then((response) {
-          if (response.startsWith('PROGRESS:')) {
-            // Update sender progress based on receiver progress
-            final progressStr = response.substring(9);
-            final receiverProgress = double.tryParse(progressStr) ?? 0.0;
-            appState.setActiveTransfer(
-              appState.activeTransfer!.copyWith(progress: receiverProgress),
-            );
-            // Continue listening for more updates
-            lineQueue.next.then(
-              (_) => _listenForProgressUpdates(lineQueue, appState),
-            );
-          }
-        })
-        .catchError((e) {
-          // Ignore errors during progress listening
-          if (kDebugMode) print("Progress listening ended: $e");
-        });
   }
 
   /// Determines optimal chunk size based on file size for better performance

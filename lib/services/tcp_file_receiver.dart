@@ -12,6 +12,7 @@ class _TransferState {
   IOSink? fileSink;
   int receivedBytes = 0;
   FileInfo? fileInfo;
+  String? savePath; // Track the actual save path for cleanup
 }
 
 class TcpFileReceiver {
@@ -152,6 +153,24 @@ class TcpFileReceiver {
                     // Metadata already parsed, stream file data directly to disk
                     final transferState = _activeTransfers[client];
                     if (transferState?.fileSink != null) {
+                      // Check if transfer was cancelled
+                      if (appState.activeTransfer?.status == TransferStatus.failed) {
+                        // Transfer was cancelled - clean up and notify sender
+                        await transferState!.fileSink!.close();
+                        if (transferState.savePath != null) {
+                          final partialFile = File(transferState.savePath!);
+                          if (await partialFile.exists()) {
+                            await partialFile.delete();
+                            if (kDebugMode) print("Deleted partial file: ${transferState.savePath}");
+                          }
+                        }
+                        _activeTransfers.remove(client);
+                        client.write('CANCELLED\n');
+                        await client.flush();
+                        client.destroy();
+                        return;
+                      }
+
                       transferState!.fileSink!.add(data);
                       transferState.receivedBytes += data.length;
 
@@ -282,6 +301,7 @@ class TcpFileReceiver {
       if (transferState != null) {
         transferState.fileSink = file.openWrite();
         transferState.receivedBytes = 0;
+        transferState.savePath = savePath; // Store save path for cleanup
 
         // Process any file data that came with the metadata
         if (dataBuffer.length > metadataEndIndex + 1) {
