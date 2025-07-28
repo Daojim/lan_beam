@@ -4,7 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import '../models/app_state.dart';
 import '../models/transfer_session.dart';
 import '../models/device.dart';
-import '../models/file_info.dart';
+import '../models/transfer_item.dart';
 import '../screens/incoming_request_screen.dart';
 import '../screens/transfer_progress_screen.dart';
 import '../services/tcp_file_sender.dart';
@@ -28,7 +28,7 @@ class HomeScreen extends StatelessWidget {
       }
     });
 
-    final selectedFile = appState.selectedFile;
+    final selectedItem = appState.selectedItem;
 
     return Column(
       children: [
@@ -54,11 +54,11 @@ class HomeScreen extends StatelessWidget {
               // File Selection Section (fixed at top)
               _buildInfoCard(
                 context,
-                title: 'File Selection',
+                title: 'File & Folder Selection',
                 children: [
-                  if (selectedFile == null) ...[
+                  if (selectedItem == null) ...[
                     const Text(
-                      'No file selected.',
+                      'No file or folder selected.',
                       style: TextStyle(color: Colors.grey),
                     ),
                     const SizedBox(height: 12),
@@ -72,8 +72,10 @@ class HomeScreen extends StatelessWidget {
                       ),
                       child: Row(
                         children: [
-                          const Icon(
-                            Icons.insert_drive_file,
+                          Icon(
+                            selectedItem.type == TransferItemType.file
+                                ? Icons.insert_drive_file
+                                : Icons.folder,
                             color: Colors.blue,
                           ),
                           const SizedBox(width: 12),
@@ -82,13 +84,13 @@ class HomeScreen extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  selectedFile.fileName,
+                                  selectedItem.name,
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
                                 Text(
-                                  '${selectedFile.formattedSize} • ${selectedFile.fileType}',
+                                  '${selectedItem.formattedSize} • ${selectedItem.type == TransferItemType.file ? 'File' : 'Folder'}',
                                   style: TextStyle(
                                     color: Colors.grey[600],
                                     fontSize: 12,
@@ -98,9 +100,9 @@ class HomeScreen extends StatelessWidget {
                             ),
                           ),
                           IconButton(
-                            onPressed: () => appState.setSelectedFile(null),
+                            onPressed: () => appState.setSelectedItem(null),
                             icon: const Icon(Icons.close, color: Colors.red),
-                            tooltip: 'Remove file',
+                            tooltip: 'Clear selection',
                           ),
                         ],
                       ),
@@ -108,80 +110,24 @@ class HomeScreen extends StatelessWidget {
                     const SizedBox(height: 12),
                   ],
 
-                  // File picker buttons
+                  // File and folder picker buttons
                   Row(
                     children: [
-                      ElevatedButton.icon(
-                        onPressed: () async {
-                          FilePickerResult? result = await FilePicker.platform
-                              .pickFiles();
-
-                          if (result != null && result.files.isNotEmpty) {
-                            final pickedFile = result.files.first;
-
-                            final fileInfoResult = FileInfo.create(
-                              fileName: pickedFile.name,
-                              fileSizeBytes: pickedFile.size,
-                              fileType: pickedFile.extension != null
-                                  ? '.${pickedFile.extension}'
-                                  : '',
-                              filePath: pickedFile.path ?? '',
-                            );
-
-                            if (fileInfoResult.isSuccess) {
-                              appState.setSelectedFile(fileInfoResult.value);
-                            } else {
-                              // Show error dialog
-                              showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: const Text('Invalid File'),
-                                  content: Text(
-                                    fileInfoResult.error ?? 'Unknown error',
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.of(context).pop(),
-                                      child: const Text('OK'),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }
-                          } else {
-                            // Non-intrusive dialog instead of SnackBar
-                            showDialog(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: const Text('No File Selected'),
-                                content: const Text(
-                                  'Please choose a file to continue.',
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.of(context).pop(),
-                                    child: const Text('OK'),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }
-                        },
-                        icon: const Icon(Icons.folder_open),
-                        label: Text(
-                          selectedFile == null ? 'Choose File' : 'Change File',
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => _pickFile(context, appState),
+                          icon: const Icon(Icons.insert_drive_file),
+                          label: const Text('Choose File'),
                         ),
                       ),
-                      if (selectedFile != null) ...[
-                        const SizedBox(width: 12),
-                        OutlinedButton.icon(
-                          onPressed: () => appState.setSelectedFile(null),
-                          icon: const Icon(Icons.clear),
-                          label: const Text('Clear'),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => _pickFolder(context, appState),
+                          icon: const Icon(Icons.folder),
+                          label: const Text('Choose Folder'),
                         ),
-                      ],
+                      ),
                     ],
                   ),
                 ],
@@ -191,7 +137,7 @@ class HomeScreen extends StatelessWidget {
         ),
 
         // Scrollable device list section
-        if (selectedFile != null) ...[
+        if (selectedItem != null) ...[
           Expanded(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -247,15 +193,32 @@ class HomeScreen extends StatelessWidget {
                               subtitle: Text(device.ipAddress),
                               trailing: ElevatedButton.icon(
                                 onPressed:
-                                    device.status == DeviceStatus.available
+                                    device.status == DeviceStatus.available &&
+                                        selectedItem.type ==
+                                            TransferItemType.file
                                     ? () => _sendFileToDevice(
                                         context,
                                         appState,
                                         device,
                                       )
                                     : null,
-                                icon: const Icon(Icons.send),
-                                label: const Text('Send'),
+                                icon: Icon(
+                                  selectedItem.type == TransferItemType.folder
+                                      ? Icons.folder_off
+                                      : Icons.send,
+                                ),
+                                label: Text(
+                                  selectedItem.type == TransferItemType.folder
+                                      ? 'Coming Soon'
+                                      : 'Send',
+                                ),
+                                style:
+                                    selectedItem.type == TransferItemType.folder
+                                    ? ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.orange.shade100,
+                                        foregroundColor: Colors.orange.shade700,
+                                      )
+                                    : null,
                               ),
                             ),
                           );
@@ -277,13 +240,24 @@ class HomeScreen extends StatelessWidget {
     AppState appState,
     Device device,
   ) async {
-    if (appState.selectedFile == null) return;
+    if (appState.selectedItem == null) return;
+
+    // Check if trying to send a folder
+    if (appState.selectedItem!.type == TransferItemType.folder) {
+      _showErrorDialog(
+        context,
+        'Folder Transfer Not Yet Supported',
+        'Folder transfers are coming soon! For now, please select individual files.',
+      );
+      return;
+    }
 
     // Start transfer session visually first
     appState.setActiveTransfer(
       TransferSession(
         direction: TransferDirection.sending,
-        file: appState.selectedFile!,
+        file: appState
+            .selectedFile!, // This will use the backward compatibility getter
         progress: 0.0,
         status: TransferStatus.connecting,
         peerDevice: device,
@@ -297,7 +271,10 @@ class HomeScreen extends StatelessWidget {
 
     // Start sending file over TCP
     final sender = TcpFileSender(appState);
-    await sender.sendFile(appState.selectedFile!, device);
+    await sender.sendFile(
+      appState.selectedFile!,
+      device,
+    ); // This will use the backward compatibility getter
   }
 
   // Filter out current device unless testing mode is enabled
@@ -335,6 +312,68 @@ class HomeScreen extends StatelessWidget {
             ...children,
           ],
         ),
+      ),
+    );
+  }
+
+  // File picker method
+  Future<void> _pickFile(BuildContext context, AppState appState) async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles();
+
+    if (result != null && result.files.isNotEmpty) {
+      final pickedFile = result.files.first;
+      if (pickedFile.path != null) {
+        final itemResult = TransferItem.createFile(filePath: pickedFile.path!);
+        if (itemResult.isSuccess) {
+          appState.setSelectedItem(itemResult.value);
+        } else {
+          _showErrorDialog(context, 'Invalid File', itemResult.error!);
+        }
+      }
+    } else {
+      _showErrorDialog(
+        context,
+        'No File Selected',
+        'Please choose a file to continue.',
+      );
+    }
+  }
+
+  // Folder picker method
+  Future<void> _pickFolder(BuildContext context, AppState appState) async {
+    String? directoryPath = await FilePicker.platform.getDirectoryPath();
+
+    if (directoryPath != null) {
+      final itemResult = await TransferItem.createFolder(
+        folderPath: directoryPath,
+      );
+      if (itemResult.isSuccess) {
+        appState.setSelectedItem(itemResult.value);
+      } else {
+        _showErrorDialog(context, 'Invalid Folder', itemResult.error!);
+      }
+    } else {
+      _showErrorDialog(
+        context,
+        'No Folder Selected',
+        'Please choose a folder to continue.',
+      );
+    }
+  }
+
+  // Error dialog helper
+  void _showErrorDialog(BuildContext context, String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
       ),
     );
   }

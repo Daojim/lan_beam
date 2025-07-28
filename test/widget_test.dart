@@ -20,7 +20,7 @@ void main() {
     // Create a test app state
     final testAppState = AppState(
       discoveredDevices: [],
-      selectedFile: null,
+      selectedItem: null, // Changed from selectedFile
       activeTransfer: null,
       settings: AppSettings(
         localDeviceName: 'Test Device',
@@ -56,7 +56,7 @@ void main() {
     // Create a test app state
     final testAppState = AppState(
       discoveredDevices: [],
-      selectedFile: null,
+      selectedItem: null, // Changed from selectedFile
       activeTransfer: null,
       settings: AppSettings(
         localDeviceName: 'Test Device',

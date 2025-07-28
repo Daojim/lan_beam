@@ -62,20 +62,6 @@ class TransferProgressScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   LinearProgressIndicator(value: session.progress),
-                  const SizedBox(height: 32),
-                  ElevatedButton(
-                    onPressed: () {
-                      double newProgress = (session.progress + 0.1).clamp(
-                        0.0,
-                        1.0,
-                      );
-                      final updatedSession = session.copyWith(
-                        progress: newProgress,
-                      );
-                      appState.setActiveTransfer(updatedSession);
-                    },
-                    child: const Text('Simulate Progress'),
-                  ),
                 ],
               ),
             ),

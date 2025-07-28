@@ -135,7 +135,7 @@ void main() {
   // Initialize AppState first
   final initialState = AppState(
     discoveredDevices: [],
-    selectedFile: null,
+    selectedItem: null, // Changed from selectedFile
     activeTransfer: null,
     settings: AppSettings(
       localDeviceName: generateDeviceName(),

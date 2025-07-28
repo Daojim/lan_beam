@@ -33,19 +33,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.dispose();
   }
 
-  void _saveSettings() {
-    final appState = context.read<AppState>();
-    final newSettings = AppSettings(
-      localDeviceName: _deviceNameController.text,
-      defaultSaveFolder: _saveFolderController.text,
-      showMyDeviceForTesting: appState.settings.showMyDeviceForTesting,
-    );
-    appState.updateSettings(newSettings);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Settings saved')));
-  }
-
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
@@ -59,6 +46,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             TextField(
               controller: _deviceNameController,
               decoration: const InputDecoration(labelText: 'Device Name'),
+              onChanged: (value) {
+                final appState = context.read<AppState>();
+                final newSettings = AppSettings(
+                  localDeviceName: value,
+                  defaultSaveFolder: appState.settings.defaultSaveFolder,
+                  showMyDeviceForTesting:
+                      appState.settings.showMyDeviceForTesting,
+                );
+                appState.updateSettings(newSettings);
+              },
             ),
             const SizedBox(height: 16),
             TextField(
@@ -66,6 +63,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               decoration: const InputDecoration(
                 labelText: 'Default Save Folder',
               ),
+              onChanged: (value) {
+                final appState = context.read<AppState>();
+                final newSettings = AppSettings(
+                  localDeviceName: appState.settings.localDeviceName,
+                  defaultSaveFolder: value,
+                  showMyDeviceForTesting:
+                      appState.settings.showMyDeviceForTesting,
+                );
+                appState.updateSettings(newSettings);
+              },
             ),
             const SizedBox(height: 32),
 
@@ -104,11 +111,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
 
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: _saveSettings,
-              child: const Text('Save Settings'),
-            ),
+            const SizedBox(height: 16),
           ],
         ),
       ),

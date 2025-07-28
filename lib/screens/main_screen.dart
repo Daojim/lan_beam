@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'settings_screen.dart';
 import 'transfer_progress_screen.dart';
+import '../widgets/toast_overlay.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -27,63 +28,65 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Row(
-        children: [
-          // Permanent Sidebar
-          Container(
-            width: 250,
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              border: Border(
-                right: BorderSide(color: Colors.grey[300]!, width: 1),
+    return ToastOverlay(
+      child: Scaffold(
+        body: Row(
+          children: [
+            // Permanent Sidebar
+            Container(
+              width: 250,
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                border: Border(
+                  right: BorderSide(color: Colors.grey[300]!, width: 1),
+                ),
               ),
-            ),
-            child: Column(
-              children: [
-                // Sidebar Header
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: const BoxDecoration(color: Colors.blue),
-                  child: const Text(
-                    'LAN Beam',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+              child: Column(
+                children: [
+                  // Sidebar Header
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: const BoxDecoration(color: Colors.blue),
+                    child: const Text(
+                      'LAN Beam',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                ),
-                // Sidebar Menu Items
-                Expanded(
-                  child: ListView(
-                    padding: EdgeInsets.zero,
-                    children: [
-                      _buildSidebarItem(
-                        icon: Icons.home,
-                        title: 'Home',
-                        index: 0,
-                      ),
-                      _buildSidebarItem(
-                        icon: Icons.settings,
-                        title: 'Settings',
-                        index: 1,
-                      ),
-                      _buildSidebarItem(
-                        icon: Icons.swap_horiz,
-                        title: 'Transfer Progress',
-                        index: 2,
-                      ),
-                    ],
+                  // Sidebar Menu Items
+                  Expanded(
+                    child: ListView(
+                      padding: EdgeInsets.zero,
+                      children: [
+                        _buildSidebarItem(
+                          icon: Icons.home,
+                          title: 'Home',
+                          index: 0,
+                        ),
+                        _buildSidebarItem(
+                          icon: Icons.settings,
+                          title: 'Settings',
+                          index: 1,
+                        ),
+                        _buildSidebarItem(
+                          icon: Icons.swap_horiz,
+                          title: 'Transfer Progress',
+                          index: 2,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          // Main Content Area
-          Expanded(child: _screens[_selectedIndex]),
-        ],
+            // Main Content Area
+            Expanded(child: _screens[_selectedIndex]),
+          ],
+        ),
       ),
     );
   }
