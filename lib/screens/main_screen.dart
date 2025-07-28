@@ -82,9 +82,7 @@ class _MainScreenState extends State<MainScreen> {
             ),
           ),
           // Main Content Area
-          Expanded(
-            child: _screens[_selectedIndex],
-          ),
+          Expanded(child: _screens[_selectedIndex]),
         ],
       ),
     );
