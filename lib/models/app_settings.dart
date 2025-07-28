@@ -4,7 +4,7 @@ class AppSettings {
   final bool showMyDeviceForTesting;
 
   AppSettings({
-    required this.localDeviceName, 
+    required this.localDeviceName,
     required this.defaultSaveFolder,
     this.showMyDeviceForTesting = false,
   });

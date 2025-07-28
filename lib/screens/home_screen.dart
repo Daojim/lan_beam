@@ -47,46 +47,6 @@ class HomeScreen extends StatelessWidget {
               ],
             ),
 
-            const SizedBox(height: 16),
-
-            // Test Mode Button (disabled when no file selected)
-            Align(
-              alignment: Alignment.centerRight,
-              child: ElevatedButton.icon(
-                onPressed: appState.selectedFile != null
-                    ? () {
-                        // Create a fake sending TransferSession to simulate an incoming request
-                        appState.setActiveTransfer(
-                          TransferSession(
-                            direction: TransferDirection.sending,
-                            file: appState.selectedFile!,
-                            progress: 0.0,
-                            status: TransferStatus.idle,
-                            peerDevice: Device(
-                              name: 'TestSender-PC',
-                              ipAddress: '192.168.1.99',
-                              status: DeviceStatus.available,
-                            ),
-                          ),
-                        );
-
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const IncomingRequestScreen(),
-                          ),
-                        );
-                      }
-                    : null,
-                icon: const Icon(Icons.bug_report),
-                label: const Text('Test Mode'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: appState.selectedFile != null
-                      ? null
-                      : Colors.grey.shade300,
-                ),
-              ),
-            ),
-
             const SizedBox(height: 24),
 
             // File Selection Section
@@ -207,64 +167,62 @@ class HomeScreen extends StatelessWidget {
               _buildInfoCard(
                 context,
                 title: 'Send to Device',
-                children: [
-                  if (_getFilteredDevices(appState).isEmpty) ...[
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: Colors.orange.withOpacity(0.3),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.search, color: Colors.orange),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'Searching for devices...\nMake sure other devices have LAN Beam open.',
-                              style: TextStyle(color: Colors.orange.shade700),
-                            ),
-                          ),
-                        ],
-                      ),
+              children: [
+                if (_getFilteredDevices(appState).isEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
                     ),
-                  ] else ...[
-                    ..._getFilteredDevices(appState).map(
-                      (device) => Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: ListTile(
-                          leading: Icon(
-                            Icons.devices,
-                            color: device.status == DeviceStatus.available
-                                ? Colors.green
-                                : Colors.grey,
+                    child: Row(
+                      children: [
+                        Icon(Icons.search, color: Colors.orange),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Searching for devices...\nMake sure other devices have LAN Beam open.',
+                            style: TextStyle(color: Colors.orange.shade700),
                           ),
-                          title: Text(device.name),
-                          subtitle: Text(device.ipAddress),
-                          trailing: ElevatedButton.icon(
-                            onPressed: device.status == DeviceStatus.available
-                                ? () => _sendFileToDevice(
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  ..._getFilteredDevices(appState).map(
+                    (device) => Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: ListTile(
+                        leading: Icon(
+                          Icons.devices,
+                          color: device.status == DeviceStatus.available
+                              ? Colors.green
+                              : Colors.grey,
+                        ),
+                        title: Text(device.name),
+                        subtitle: Text(device.ipAddress),
+                        trailing: ElevatedButton.icon(
+                          onPressed: device.status == DeviceStatus.available
+                              ? () => _sendFileToDevice(
                                     context,
                                     appState,
                                     device,
                                   )
-                                : null,
-                            icon: const Icon(Icons.send),
-                            label: const Text('Send'),
-                          ),
+                              : null,
+                          icon: const Icon(Icons.send),
+                          label: const Text('Send'),
                         ),
                       ),
                     ),
-                  ],
+                  ),
                 ],
-              ),
+              ],
+            ),
             ],
           ],
         ),
