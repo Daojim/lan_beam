@@ -19,8 +19,6 @@ class _MainScreenState extends State<MainScreen> {
     TransferProgressScreen(),
   ];
 
-  final List<String> _titles = ['Home', 'Settings', 'Transfer Progress'];
-
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -85,36 +83,7 @@ class _MainScreenState extends State<MainScreen> {
           ),
           // Main Content Area
           Expanded(
-            child: Column(
-              children: [
-                // Top Bar
-                Container(
-                  width: double.infinity,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border(
-                      bottom: BorderSide(color: Colors.grey[300]!, width: 1),
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        _titles[_selectedIndex],
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                // Screen Content
-                Expanded(child: _screens[_selectedIndex]),
-              ],
-            ),
+            child: _screens[_selectedIndex],
           ),
         ],
       ),

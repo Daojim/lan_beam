@@ -43,90 +43,45 @@ class HomeScreen extends StatelessWidget {
               Text('Device Name: ${appState.settings.localDeviceName}'),
               const SizedBox(height: 8),
               Text('Save Folder: ${appState.settings.defaultSaveFolder}'),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Text(
-                    'Status: ${appState.isListening ? "Listening" : "Stopped"}',
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    appState.isListening
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                    color: appState.isListening ? Colors.green : Colors.grey,
-                    size: 16,
-                  ),
-                ],
-              ),
             ],
           ),
 
           const SizedBox(height: 16),
 
-          // Control Buttons - Auto-discovery info and test mode
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.green.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.wifi, color: Colors.green),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Auto-discovery active',
-                        style: TextStyle(
-                          color: Colors.green.shade700,
-                          fontWeight: FontWeight.w500,
+          // Test Mode Button
+          Align(
+            alignment: Alignment.centerRight,
+            child: ElevatedButton.icon(
+              onPressed: appState.selectedFile != null
+                  ? () {
+                      // Create a fake sending TransferSession to simulate an incoming request
+                      appState.setActiveTransfer(
+                        TransferSession(
+                          direction: TransferDirection.sending,
+                          file: appState.selectedFile!,
+                          progress: 0.0,
+                          status: TransferStatus.idle,
+                          peerDevice: Device(
+                            name: 'TestSender-PC',
+                            ipAddress: '192.168.1.99',
+                            status: DeviceStatus.available,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton.icon(
-                onPressed: () {
-                  if (appState.selectedFile == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Please pick a file first.'),
-                      ),
-                    );
-                    return;
-                  }
+                      );
 
-                  // Create a fake sending TransferSession to simulate an incoming request
-                  appState.setActiveTransfer(
-                    TransferSession(
-                      direction: TransferDirection.sending,
-                      file: appState.selectedFile!,
-                      progress: 0.0,
-                      status: TransferStatus.idle,
-                      peerDevice: Device(
-                        name: 'TestSender-PC',
-                        ipAddress: '192.168.1.99',
-                        status: DeviceStatus.available,
-                      ),
-                    ),
-                  );
-
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const IncomingRequestScreen(),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.bug_report),
-                label: const Text('Test Mode'),
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const IncomingRequestScreen(),
+                        ),
+                      );
+                    }
+                  : null,
+              icon: const Icon(Icons.bug_report),
+              label: const Text('Test Mode'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: appState.selectedFile != null ? null : Colors.grey.shade300,
               ),
-            ],
+            ),
           ),
 
           const SizedBox(height: 24),
@@ -207,8 +162,18 @@ class HomeScreen extends StatelessWidget {
                           ),
                         );
                       } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('No file selected')),
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('No File Selected'),
+                            content: const Text('Please choose a file to continue.'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                child: const Text('OK'),
+                              ),
+                            ],
+                          ),
                         );
                       }
                     },
