@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
 import '../models/app_state.dart';
 import '../models/app_settings.dart';
 
@@ -58,21 +59,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
             ),
             const SizedBox(height: 16),
-            TextField(
-              controller: _saveFolderController,
-              decoration: const InputDecoration(
-                labelText: 'Default Save Folder',
-              ),
-              onChanged: (value) {
-                final appState = context.read<AppState>();
-                final newSettings = AppSettings(
-                  localDeviceName: appState.settings.localDeviceName,
-                  defaultSaveFolder: value,
-                  showMyDeviceForTesting:
-                      appState.settings.showMyDeviceForTesting,
-                );
-                appState.updateSettings(newSettings);
-              },
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _saveFolderController,
+                    decoration: const InputDecoration(
+                      labelText: 'Default Save Folder',
+                    ),
+                    onChanged: (value) {
+                      final appState = context.read<AppState>();
+                      final newSettings = AppSettings(
+                        localDeviceName: appState.settings.localDeviceName,
+                        defaultSaveFolder: value,
+                        showMyDeviceForTesting:
+                            appState.settings.showMyDeviceForTesting,
+                      );
+                      appState.updateSettings(newSettings);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: () => _pickSaveFolder(context),
+                  child: const Text('Browse'),
+                ),
+              ],
             ),
             const SizedBox(height: 32),
 
@@ -116,5 +128,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _pickSaveFolder(BuildContext context) async {
+    String? directoryPath = await FilePicker.platform.getDirectoryPath();
+
+    if (directoryPath != null) {
+      _saveFolderController.text = directoryPath;
+
+      final appState = context.read<AppState>();
+      final newSettings = AppSettings(
+        localDeviceName: appState.settings.localDeviceName,
+        defaultSaveFolder: directoryPath,
+        showMyDeviceForTesting: appState.settings.showMyDeviceForTesting,
+      );
+      appState.updateSettings(newSettings);
+    }
   }
 }

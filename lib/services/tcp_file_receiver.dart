@@ -209,9 +209,11 @@ class TcpFileReceiver {
       client.write('ACCEPTED\n');
       await client.flush();
 
-      // Prepare save location
-      final savePath =
-          '${appState.settings.defaultSaveFolder}/${fileInfo.fileName}';
+      // Prepare save location with collision handling
+      final savePath = _generateUniqueFilePath(
+        appState.settings.defaultSaveFolder,
+        fileInfo.fileName,
+      );
       final file = File(savePath);
       final sink = file.openWrite();
 
@@ -263,6 +265,14 @@ class TcpFileReceiver {
           print(
             "File size mismatch: expected ${fileInfo.fileSizeBytes}, got $actualFileSize",
           );
+
+        // Clean up partial file
+        try {
+          await file.delete();
+        } catch (e) {
+          if (kDebugMode) print("Could not delete partial file: $e");
+        }
+
         appState.setActiveTransfer(
           appState.activeTransfer!.copyWith(status: TransferStatus.failed),
         );
@@ -298,5 +308,43 @@ class TcpFileReceiver {
   Future<void> stopListening() async {
     await _server?.close();
     _server = null;
+  }
+
+  /// Generates a unique file path by adding incremental numbers if file exists
+  String _generateUniqueFilePath(String saveFolder, String fileName) {
+    // Parse the original filename and extension
+    final lastDot = fileName.lastIndexOf('.');
+    String nameWithoutExtension;
+    String extension;
+
+    if (lastDot > 0 && lastDot < fileName.length - 1) {
+      nameWithoutExtension = fileName.substring(0, lastDot);
+      extension = fileName.substring(lastDot);
+    } else {
+      nameWithoutExtension = fileName;
+      extension = '';
+    }
+
+    // Start with the original path
+    String candidatePath = '$saveFolder/$fileName';
+    File candidateFile = File(candidatePath);
+
+    // If file doesn't exist, use original name
+    if (!candidateFile.existsSync()) {
+      return candidatePath;
+    }
+
+    // File exists, find next available number
+    int counter = 1;
+    while (true) {
+      final newFileName = '$nameWithoutExtension-$counter$extension';
+      candidatePath = '$saveFolder/$newFileName';
+      candidateFile = File(candidatePath);
+
+      if (!candidateFile.existsSync()) {
+        return candidatePath;
+      }
+      counter++;
+    }
   }
 }
