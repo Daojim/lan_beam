@@ -72,8 +72,8 @@ class AppState extends ChangeNotifier {
   }
 
   void setActiveTransfer(TransferSession? session) {
-    if (session != null && 
-        session.status == TransferStatus.transferring && 
+    if (session != null &&
+        session.status == TransferStatus.transferring &&
         activeTransfer?.status == TransferStatus.transferring &&
         activeTransfer?.file.fileName == session.file.fileName) {
       // Only debounce progress updates for ongoing transfers, not status changes

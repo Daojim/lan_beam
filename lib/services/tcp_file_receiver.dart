@@ -13,6 +13,7 @@ class _TransferState {
   int receivedBytes = 0;
   FileInfo? fileInfo;
   String? savePath; // Track the actual save path for cleanup
+  bool isCancelled = false; // Flag for immediate cancellation detection
 }
 
 class TcpFileReceiver {
@@ -152,16 +153,23 @@ class TcpFileReceiver {
                   } else {
                     // Metadata already parsed, stream file data directly to disk
                     final transferState = _activeTransfers[client];
-                    if (transferState?.fileSink != null) {
-                      // Check if transfer was cancelled
-                      if (appState.activeTransfer?.status == TransferStatus.failed) {
-                        // Transfer was cancelled - clean up and notify sender
-                        await transferState!.fileSink!.close();
+                    if (transferState != null &&
+                        transferState.fileSink != null) {
+                      // Check if transfer was cancelled BEFORE processing any data
+                      if (appState.activeTransfer?.status ==
+                              TransferStatus.failed ||
+                          transferState.isCancelled) {
+                        // Mark as cancelled and clean up immediately
+                        transferState.isCancelled = true;
+                        await transferState.fileSink!.close();
                         if (transferState.savePath != null) {
                           final partialFile = File(transferState.savePath!);
                           if (await partialFile.exists()) {
                             await partialFile.delete();
-                            if (kDebugMode) print("Deleted partial file: ${transferState.savePath}");
+                            if (kDebugMode)
+                              print(
+                                "Deleted partial file: ${transferState.savePath}",
+                              );
                           }
                         }
                         _activeTransfers.remove(client);
@@ -171,16 +179,16 @@ class TcpFileReceiver {
                         return;
                       }
 
-                      transferState!.fileSink!.add(data);
+                      transferState.fileSink!.add(data);
                       transferState.receivedBytes += data.length;
 
-                      // Throttle progress updates to prevent UI flooding
+                      // Send more frequent progress updates for better synchronization
                       final progress =
                           transferState.receivedBytes /
                           transferState.fileInfo!.fileSizeBytes;
-                      if (transferState.receivedBytes % 131072 == 0 ||
+                      if (transferState.receivedBytes % 32768 == 0 ||
                           progress >= 1.0) {
-                        // Update every 128KB
+                        // Update every 32KB instead of 128KB for better sync
                         appState.setActiveTransfer(
                           appState.activeTransfer!.copyWith(progress: progress),
                         );
@@ -322,6 +330,12 @@ class TcpFileReceiver {
         // Clear the buffer to free memory - streaming will handle the rest
         dataBuffer.clear();
 
+        // Start monitoring for cancellation
+        _monitorCancellation(client, transferState);
+
+        // Send immediate initial progress to sync both sides
+        _sendProgressUpdate(client, 0.0);
+
         if (kDebugMode)
           print("Streaming mode enabled for ${fileInfo.fileName}");
       }
@@ -339,6 +353,17 @@ class TcpFileReceiver {
     } catch (e) {
       if (kDebugMode) print("Could not send progress update: $e");
     }
+  }
+
+  /// Monitor for transfer cancellation and immediately mark transfer state
+  void _monitorCancellation(Socket client, _TransferState transferState) {
+    Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      if (appState.activeTransfer?.status == TransferStatus.failed ||
+          !_activeTransfers.containsKey(client)) {
+        transferState.isCancelled = true;
+        timer.cancel();
+      }
+    });
   }
 
   Future<void> stopListening() async {

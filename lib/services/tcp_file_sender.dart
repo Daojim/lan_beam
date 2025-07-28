@@ -93,13 +93,7 @@ class TcpFileSender {
             print("Sent $sent / $totalSize bytes");
           }
 
-          // Only update sender progress if we haven't received receiver updates
-          if (appState.activeTransfer?.progress == 0.0) {
-            final sendProgress = (sent / totalSize * 0.95).clamp(0.0, 0.95);
-            appState.setActiveTransfer(
-              appState.activeTransfer!.copyWith(progress: sendProgress),
-            );
-          }
+          // Don't update sender progress - let receiver drive all progress updates
         }
       } catch (e) {
         if (kDebugMode) print("Error during file streaming: $e");
