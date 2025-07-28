@@ -5,9 +5,45 @@ import 'models/app_state.dart';
 import 'models/app_settings.dart';
 import 'screens/main_screen.dart';
 import 'services/tcp_file_receiver.dart';
+import 'services/udp_discovery_service.dart';
+import 'models/device.dart';
 
-// Create global access to TcpFileReceiver
+// Create global access to services
 late TcpFileReceiver tcpFileReceiver;
+late UdpDiscoveryService udpDiscoveryService;
+
+// Initialize auto-discovery services
+Future<void> initializeServices(AppState appState) async {
+  try {
+    // Initialize UDP discovery service
+    udpDiscoveryService = UdpDiscoveryService();
+
+    // Start listening for other devices
+    await udpDiscoveryService.startListening((device) {
+      final alreadyExists = appState.discoveredDevices.any(
+        (d) => d.ipAddress == device.ipAddress,
+      );
+      if (!alreadyExists) {
+        appState.addDevice(device);
+      }
+    });
+
+    // Start broadcasting this device
+    udpDiscoveryService.startBroadcasting(
+      appState.settings.localDeviceName,
+      DeviceStatus.available.name,
+    );
+
+    // Auto-start TCP file receiver
+    tcpFileReceiver.startListening();
+    appState.setListening(true);
+
+    print('Auto-discovery services started successfully');
+  } catch (e) {
+    print('Failed to start auto-discovery services: $e');
+    // Continue running the app even if discovery fails
+  }
+}
 
 // Get the current user's desktop path
 String getUserDesktopPath() {
@@ -110,13 +146,29 @@ void main() {
   runApp(
     ChangeNotifierProvider(
       create: (_) => initialState,
-      child: const LanBeamApp(),
+      child: LanBeamApp(appState: initialState),
     ),
   );
 }
 
-class LanBeamApp extends StatelessWidget {
-  const LanBeamApp({super.key});
+class LanBeamApp extends StatefulWidget {
+  final AppState appState;
+
+  const LanBeamApp({super.key, required this.appState});
+
+  @override
+  State<LanBeamApp> createState() => _LanBeamAppState();
+}
+
+class _LanBeamAppState extends State<LanBeamApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Initialize auto-discovery services after the widget is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      initializeServices(widget.appState);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

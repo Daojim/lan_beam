@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
-import 'discovery_screen.dart';
 import 'settings_screen.dart';
 import 'transfer_progress_screen.dart';
 
@@ -16,17 +15,11 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<Widget> _screens = [
     HomeScreen(),
-    DiscoveryScreen(),
     SettingsScreen(),
     TransferProgressScreen(),
   ];
 
-  final List<String> _titles = [
-    'Home',
-    'Discovery',
-    'Settings',
-    'Transfer Progress',
-  ];
+  final List<String> _titles = ['Home', 'Settings', 'Transfer Progress'];
 
   void _onItemTapped(int index) {
     setState(() {
@@ -75,19 +68,14 @@ class _MainScreenState extends State<MainScreen> {
                         index: 0,
                       ),
                       _buildSidebarItem(
-                        icon: Icons.devices,
-                        title: 'Discovery',
-                        index: 1,
-                      ),
-                      _buildSidebarItem(
                         icon: Icons.settings,
                         title: 'Settings',
-                        index: 2,
+                        index: 1,
                       ),
                       _buildSidebarItem(
                         icon: Icons.swap_horiz,
                         title: 'Transfer Progress',
-                        index: 3,
+                        index: 2,
                       ),
                     ],
                   ),

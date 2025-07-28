@@ -6,7 +6,8 @@ import '../models/transfer_session.dart';
 import '../models/device.dart';
 import '../models/file_info.dart';
 import '../screens/incoming_request_screen.dart';
-import '../main.dart'; // gives access to `tcpFileReceiver`
+import '../screens/transfer_progress_screen.dart';
+import '../services/tcp_file_sender.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -63,29 +64,30 @@ class HomeScreen extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          // Control Buttons
+          // Control Buttons - Auto-discovery info and test mode
           Row(
             children: [
-              ElevatedButton.icon(
-                onPressed: () {
-                  if (appState.isListening) {
-                    tcpFileReceiver.stopListening();
-                  } else {
-                    tcpFileReceiver.startListening();
-                  }
-                  appState.toggleListening();
-                },
-                icon: Icon(
-                  appState.isListening ? Icons.stop : Icons.play_arrow,
-                ),
-                label: Text(
-                  appState.isListening ? 'Stop Listening' : 'Start Listening',
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: appState.isListening
-                      ? Colors.red
-                      : Colors.green,
-                  foregroundColor: Colors.white,
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.wifi, color: Colors.green),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Auto-discovery active',
+                        style: TextStyle(
+                          color: Colors.green.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -227,9 +229,103 @@ class HomeScreen extends StatelessWidget {
               ),
             ],
           ),
+
+          // Device Selection Section (shows when file is selected)
+          if (selectedFile != null) ...[
+            const SizedBox(height: 24),
+            _buildInfoCard(
+              context,
+              title: 'Send to Device',
+              children: [
+                if (appState.discoveredDevices.isEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.search, color: Colors.orange),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Searching for devices...\nMake sure other devices have LAN Beam open.',
+                            style: TextStyle(color: Colors.orange.shade700),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  ...appState.discoveredDevices
+                      .map(
+                        (device) => Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: ListTile(
+                            leading: Icon(
+                              Icons.devices,
+                              color: device.status == DeviceStatus.available
+                                  ? Colors.green
+                                  : Colors.grey,
+                            ),
+                            title: Text(device.name),
+                            subtitle: Text(device.ipAddress),
+                            trailing: ElevatedButton.icon(
+                              onPressed: device.status == DeviceStatus.available
+                                  ? () => _sendFileToDevice(
+                                      context,
+                                      appState,
+                                      device,
+                                    )
+                                  : null,
+                              icon: const Icon(Icons.send),
+                              label: const Text('Send'),
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ],
+              ],
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  void _sendFileToDevice(
+    BuildContext context,
+    AppState appState,
+    Device device,
+  ) async {
+    if (appState.selectedFile == null) return;
+
+    // Start transfer session visually first
+    appState.setActiveTransfer(
+      TransferSession(
+        direction: TransferDirection.sending,
+        file: appState.selectedFile!,
+        progress: 0.0,
+        status: TransferStatus.connecting,
+        peerDevice: device,
+      ),
+    );
+
+    // Navigate to progress screen
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const TransferProgressScreen()),
+    );
+
+    // Start sending file over TCP
+    final sender = TcpFileSender(appState);
+    await sender.sendFile(appState.selectedFile!, device);
   }
 
   Widget _buildInfoCard(
