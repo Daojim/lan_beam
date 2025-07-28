@@ -69,11 +69,10 @@ class TcpFileReceiver {
                       try {
                         final metadata = jsonDecode(metadataString);
 
-                        final fileInfoResult = FileInfo.create(
+                        final fileInfoResult = FileInfo.createForIncomingTransfer(
                           fileName: metadata['fileName'],
                           fileSizeBytes: metadata['fileSizeBytes'],
                           fileType: metadata['fileType'],
-                          filePath: '', // Set when accepted
                         );
 
                         if (fileInfoResult.isFailure) {

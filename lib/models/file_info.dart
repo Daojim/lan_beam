@@ -49,6 +49,31 @@ class FileInfo {
     );
   }
 
+  /// Factory constructor for incoming transfers where path is set later
+  static Result<FileInfo> createForIncomingTransfer({
+    required String fileName,
+    required int fileSizeBytes,
+    required String fileType,
+  }) {
+    // Validate inputs
+    if (fileName.trim().isEmpty) {
+      return const Result.failure('File name cannot be empty');
+    }
+
+    if (fileSizeBytes < 0) {
+      return const Result.failure('File size cannot be negative');
+    }
+
+    return Result.success(
+      FileInfo._(
+        fileName: fileName.trim(),
+        fileSizeBytes: fileSizeBytes,
+        fileType: fileType.trim(),
+        filePath: '', // Will be set when user accepts transfer
+      ),
+    );
+  }
+
   // Converts raw bytes into human-readable strings "1000 B, 5.7 MB, 1.2GB"
   String get formattedSize {
     if (fileSizeBytes < 1024) return '$fileSizeBytes B';
