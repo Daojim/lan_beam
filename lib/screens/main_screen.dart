@@ -3,7 +3,6 @@ import 'home_screen.dart';
 import 'discovery_screen.dart';
 import 'settings_screen.dart';
 import 'transfer_progress_screen.dart';
-import 'file_picker_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -20,7 +19,6 @@ class _MainScreenState extends State<MainScreen> {
     DiscoveryScreen(),
     SettingsScreen(),
     TransferProgressScreen(),
-    FilePickerScreen(),
   ];
 
   final List<String> _titles = [
@@ -28,7 +26,6 @@ class _MainScreenState extends State<MainScreen> {
     'Discovery',
     'Settings',
     'Transfer Progress',
-    'File Picker',
   ];
 
   void _onItemTapped(int index) {
@@ -91,11 +88,6 @@ class _MainScreenState extends State<MainScreen> {
                         icon: Icons.swap_horiz,
                         title: 'Transfer Progress',
                         index: 3,
-                      ),
-                      _buildSidebarItem(
-                        icon: Icons.insert_drive_file,
-                        title: 'File Picker',
-                        index: 4,
                       ),
                     ],
                   ),
