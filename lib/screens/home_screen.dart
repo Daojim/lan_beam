@@ -52,116 +52,120 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 24),
 
               // File Selection Section (fixed at top)
-            _buildInfoCard(
-              context,
-              title: 'File Selection',
-              children: [
-                if (selectedFile == null) ...[
-                  const Text(
-                    'No file selected.',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                  const SizedBox(height: 12),
-                ] else ...[
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue.withOpacity(0.3)),
+              _buildInfoCard(
+                context,
+                title: 'File Selection',
+                children: [
+                  if (selectedFile == null) ...[
+                    const Text(
+                      'No file selected.',
+                      style: TextStyle(color: Colors.grey),
                     ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.insert_drive_file, color: Colors.blue),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                selectedFile.fileName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                '${selectedFile.formattedSize} • ${selectedFile.fileType}',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
+                    const SizedBox(height: 12),
+                  ] else ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.insert_drive_file,
+                            color: Colors.blue,
                           ),
-                        ),
-                        IconButton(
-                          onPressed: () => appState.setSelectedFile(null),
-                          icon: const Icon(Icons.close, color: Colors.red),
-                          tooltip: 'Remove file',
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-
-                // File picker buttons
-                Row(
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: () async {
-                        FilePickerResult? result = await FilePicker.platform
-                            .pickFiles();
-
-                        if (result != null && result.files.isNotEmpty) {
-                          final pickedFile = result.files.first;
-
-                          appState.setSelectedFile(
-                            FileInfo(
-                              fileName: pickedFile.name,
-                              fileSizeBytes: pickedFile.size,
-                              fileType: pickedFile.extension != null
-                                  ? '.${pickedFile.extension}'
-                                  : '',
-                              filePath: pickedFile.path ?? '',
-                            ),
-                          );
-                        } else {
-                          // Non-intrusive dialog instead of SnackBar
-                          showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: const Text('No File Selected'),
-                              content: const Text(
-                                'Please choose a file to continue.',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.of(context).pop(),
-                                  child: const Text('OK'),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  selectedFile.fileName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  '${selectedFile.formattedSize} • ${selectedFile.fileType}',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                  ),
                                 ),
                               ],
                             ),
-                          );
-                        }
-                      },
-                      icon: const Icon(Icons.folder_open),
-                      label: Text(
-                        selectedFile == null ? 'Choose File' : 'Change File',
+                          ),
+                          IconButton(
+                            onPressed: () => appState.setSelectedFile(null),
+                            icon: const Icon(Icons.close, color: Colors.red),
+                            tooltip: 'Remove file',
+                          ),
+                        ],
                       ),
                     ),
-                    if (selectedFile != null) ...[
-                      const SizedBox(width: 12),
-                      OutlinedButton.icon(
-                        onPressed: () => appState.setSelectedFile(null),
-                        icon: const Icon(Icons.clear),
-                        label: const Text('Clear'),
-                      ),
-                    ],
+                    const SizedBox(height: 12),
                   ],
-                ),
-              ],
-            ),
+
+                  // File picker buttons
+                  Row(
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          FilePickerResult? result = await FilePicker.platform
+                              .pickFiles();
+
+                          if (result != null && result.files.isNotEmpty) {
+                            final pickedFile = result.files.first;
+
+                            appState.setSelectedFile(
+                              FileInfo(
+                                fileName: pickedFile.name,
+                                fileSizeBytes: pickedFile.size,
+                                fileType: pickedFile.extension != null
+                                    ? '.${pickedFile.extension}'
+                                    : '',
+                                filePath: pickedFile.path ?? '',
+                              ),
+                            );
+                          } else {
+                            // Non-intrusive dialog instead of SnackBar
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text('No File Selected'),
+                                content: const Text(
+                                  'Please choose a file to continue.',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.of(context).pop(),
+                                    child: const Text('OK'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.folder_open),
+                        label: Text(
+                          selectedFile == null ? 'Choose File' : 'Change File',
+                        ),
+                      ),
+                      if (selectedFile != null) ...[
+                        const SizedBox(width: 12),
+                        OutlinedButton.icon(
+                          onPressed: () => appState.setSelectedFile(null),
+                          icon: const Icon(Icons.clear),
+                          label: const Text('Clear'),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -222,12 +226,13 @@ class HomeScreen extends StatelessWidget {
                               title: Text(device.name),
                               subtitle: Text(device.ipAddress),
                               trailing: ElevatedButton.icon(
-                                onPressed: device.status == DeviceStatus.available
+                                onPressed:
+                                    device.status == DeviceStatus.available
                                     ? () => _sendFileToDevice(
-                                          context,
-                                          appState,
-                                          device,
-                                        )
+                                        context,
+                                        appState,
+                                        device,
+                                      )
                                     : null,
                                 icon: const Icon(Icons.send),
                                 label: const Text('Send'),
