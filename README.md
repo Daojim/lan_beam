@@ -4,19 +4,21 @@
 
 LAN Beam is a Windows Flutter application that enables seamless file sharing between devices on the same Wi-Fi network. No internet required, no cloud storage needed - just pure peer-to-peer file transfer with support for files up to 10GB.
 
-![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)
+![Version](https://img.shields.io/badge/version-0.2.1-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 ## ✨ Features
 
-### 🚀 Current Capabilities (v0.2.0)
+### 🚀 Current Capabilities (v0.2.1)
 
 - **📁 Smart File Management**
 
   - Automatic file collision handling with incremental naming (`document.pdf` → `document-1.pdf`)
   - Support for all file types up to 10GB
   - Intelligent file type detection
+  - **NEW**: Enhanced partial file cleanup with proper Windows file handle management
+  - **NEW**: Fixed "file in use" errors - can now delete partial files while app is running
 
 - **🔍 Auto-Discovery**
 
@@ -27,7 +29,9 @@ LAN Beam is a Windows Flutter application that enables seamless file sharing bet
 - **📊 Transfer Management**
 
   - Real-time progress tracking with visual indicators
-  - Smart cancel behavior with proper cleanup
+  - **IMPROVED**: Smart cancel behavior with immediate cleanup and better user flow
+  - **IMPROVED**: Enhanced cancellation detection - sender cancellations now properly detected by receiver
+  - **IMPROVED**: Smoother progress synchronization with faster updates (50ms intervals)
   - Automatic partial file cleanup on failed transfers
   - Direction-aware navigation (sending vs receiving)
 
@@ -37,6 +41,8 @@ LAN Beam is a Windows Flutter application that enables seamless file sharing bet
   - Responsive UI with fixed headers and scrollable content
   - Smart state management across different screens
   - Intuitive accept/reject flow for incoming transfers
+  - **NEW**: Improved cancellation flow - clear "CANCELLED" status with one-click return to home
+  - **NEW**: Enhanced visual feedback with color-coded status indicators
 
 - **⚙️ Customizable Settings**
   - Configurable device name
@@ -48,8 +54,9 @@ LAN Beam is a Windows Flutter application that enables seamless file sharing bet
 
 - **Local Network Only** - Files never leave your network
 - **No Cloud Storage** - Direct peer-to-peer transfers
-- **Automatic Cleanup** - Failed transfers don't leave partial files
-- **Smart Navigation** - Prevents getting stuck in transfer loops
+- **Enhanced Cleanup** - Robust file handle management prevents system locks
+- **Improved Navigation** - Seamless transfer cancellation without UI confusion
+- **Better Error Handling** - Enhanced socket disconnection detection and recovery
 
 ## 🚀 Getting Started
 
@@ -58,7 +65,7 @@ LAN Beam is a Windows Flutter application that enables seamless file sharing bet
 #### Windows
 
 1. Download the latest release from [Releases](https://github.com/Daojim/lan_beam/releases)
-2. Extract `lan_beam_v0.2.0_windows.zip`
+2. Extract `lan_beam_v0.2.1_windows.zip`
 3. Run `lan_beam.exe`
 
 #### Building from Source
@@ -94,7 +101,33 @@ flutter build windows
    - Accept or reject incoming file requests
    - Files are automatically saved to your configured folder
 
-## 🛣️ Roadmap
+## � Changelog
+
+### v0.2.1 - File Transfer Reliability & Cancellation Fixes
+
+**🔧 Critical Fixes:**
+
+- Fixed "file in use" errors preventing deletion of partial files after cancellation
+- Resolved Windows file handle locks that required closing the app to delete files
+- Fixed receiver-side cancellation flow that forced users through multiple screens
+- Fixed sender cancellation detection - receiver now properly detects when sender cancels
+
+**🚀 Improvements:**
+
+- Enhanced file handle management with proper cleanup sequence and retry logic
+- Improved cancellation experience with clear visual feedback and one-click navigation
+- Better progress synchronization with smoother updates (50ms intervals)
+- Enhanced socket disconnection detection and automatic cleanup
+
+### v0.2.0 - Major Feature Release
+
+- Smart file collision handling with incremental naming
+- Enhanced transfer management with real-time progress tracking
+- Improved UI/UX with responsive design and toast notifications
+- Direction-aware navigation and smart state management
+- Comprehensive settings with custom save folders and device naming
+
+## �🛣️ Roadmap
 
 ### 📋 Planned Features
 
@@ -127,9 +160,11 @@ flutter build windows
 ### Network Protocol
 
 - **Discovery**: UDP broadcast on local network
-- **Transfer**: TCP stream with metadata exchange
+- **Transfer**: TCP stream with metadata exchange and enhanced disconnection detection
 - **Ports**: UDP 65000, TCP 65001
-- **Transfer Chunks**: 4KB blocks for optimal performance
+- **Transfer Chunks**: Adaptive chunk sizes (4KB-2MB) for optimal performance
+- **Progress Updates**: Real-time synchronization with 50ms intervals
+- **Cleanup**: Robust file handle management with retry logic and proper closure
 
 ### System Requirements
 
