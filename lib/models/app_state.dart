@@ -75,17 +75,19 @@ class AppState extends ChangeNotifier {
     if (session != null &&
         session.status == TransferStatus.transferring &&
         activeTransfer?.status == TransferStatus.transferring &&
-        activeTransfer?.file.fileName == session.file.fileName) {
-      // Only debounce progress updates for ongoing transfers, not status changes
+        activeTransfer?.file.fileName == session.file.fileName &&
+        (session.progress - (activeTransfer?.progress ?? 0.0)).abs() < 0.1) {
+      // Only debounce small progress updates for ongoing transfers
+      // This reduces UI flooding while keeping progress smooth
       _pendingProgressUpdate = session;
       _progressUpdateTimer?.cancel();
-      _progressUpdateTimer = Timer(const Duration(milliseconds: 100), () {
+      _progressUpdateTimer = Timer(const Duration(milliseconds: 50), () {
         activeTransfer = _pendingProgressUpdate;
         notifyListeners();
         _pendingProgressUpdate = null;
       });
     } else {
-      // Immediate updates for all status changes and initial transfers
+      // Immediate updates for status changes, completion, and significant progress jumps
       _progressUpdateTimer?.cancel();
       activeTransfer = session;
       notifyListeners();

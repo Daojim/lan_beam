@@ -70,7 +70,43 @@ class TcpFileSender {
         ),
       );
 
-      // Step 3: Stream file bytes with dynamic chunk size
+      // Step 3: Start listening for progress updates immediately in parallel
+      final progressCompleter = Completer<void>();
+      late StreamSubscription progressSubscription;
+
+      // Listen for progress updates from receiver
+      progressSubscription = lineQueue.rest.listen(
+        (response) {
+          if (response.startsWith('PROGRESS:')) {
+            final progressStr = response.substring(9);
+            final receiverProgress = double.tryParse(progressStr) ?? 0.0;
+            appState.setActiveTransfer(
+              appState.activeTransfer!.copyWith(progress: receiverProgress),
+            );
+          } else if (response == 'RECEIVED') {
+            appState.setActiveTransfer(
+              appState.activeTransfer!.copyWith(
+                status: TransferStatus.completed,
+                progress: 1.0,
+              ),
+            );
+            if (kDebugMode) print("File sent successfully.");
+            progressCompleter.complete();
+          } else if (response == 'FAILED' || response == 'CANCELLED') {
+            progressCompleter.completeError(
+              Exception("Transfer failed or was cancelled by receiver"),
+            );
+          }
+        },
+        onError: (error) => progressCompleter.completeError(error),
+        onDone: () {
+          if (!progressCompleter.isCompleted) {
+            progressCompleter.complete();
+          }
+        },
+      );
+
+      // Step 4: Stream file bytes with dynamic chunk size
       int sent = 0;
       final chunkSize = _getOptimalChunkSize(totalSize);
       final raf = fileToSend.openSync();
@@ -92,8 +128,6 @@ class TcpFileSender {
           if (kDebugMode && sent % (chunkSize * 10) == 0) {
             print("Sent $sent / $totalSize bytes");
           }
-
-          // Don't update sender progress - let receiver drive all progress updates
         }
       } catch (e) {
         if (kDebugMode) print("Error during file streaming: $e");
@@ -107,50 +141,18 @@ class TcpFileSender {
         socket.write('CANCELLED\n');
         await socket.flush();
         socket.destroy();
+        await progressSubscription.cancel();
         return;
       }
 
-      // Ensure all data is flushed before waiting for final response
+      // Ensure all data is flushed before waiting for completion
       await socket.flush();
 
-      // Step 4: Listen for both progress updates and final response
-      bool transferComplete = false;
-      while (!transferComplete) {
-        try {
-          final response = await lineQueue.next.timeout(
-            const Duration(seconds: 30),
-            onTimeout: () => throw TimeoutException(
-              "Receiver did not respond within 30 seconds",
-            ),
-          );
-
-          if (response.startsWith('PROGRESS:')) {
-            // Update sender progress based on receiver progress
-            final progressStr = response.substring(9);
-            final receiverProgress = double.tryParse(progressStr) ?? 0.0;
-            appState.setActiveTransfer(
-              appState.activeTransfer!.copyWith(progress: receiverProgress),
-            );
-          } else if (response == 'RECEIVED') {
-            // Transfer completed successfully
-            appState.setActiveTransfer(
-              appState.activeTransfer!.copyWith(
-                status: TransferStatus.completed,
-                progress: 1.0,
-              ),
-            );
-            if (kDebugMode) print("File sent successfully.");
-            transferComplete = true;
-          } else if (response == 'FAILED' || response == 'CANCELLED') {
-            throw Exception("Transfer failed or was cancelled by receiver");
-          }
-        } catch (e) {
-          if (e is TimeoutException) {
-            throw e;
-          }
-          // Other errors might be connection issues
-          transferComplete = true;
-        }
+      // Wait for transfer completion
+      try {
+        await progressCompleter.future.timeout(const Duration(seconds: 60));
+      } finally {
+        await progressSubscription.cancel();
       }
     } catch (e) {
       if (kDebugMode) print("Error during file transfer: $e");

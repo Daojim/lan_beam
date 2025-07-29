@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
-import 'dart:io';
 import '../models/app_state.dart';
 import '../models/transfer_session.dart';
+import '../services/tcp_file_receiver.dart';
+import '../utils/service_locator.dart';
 
 class TransferProgressScreen extends StatelessWidget {
   const TransferProgressScreen({super.key});
@@ -73,10 +75,17 @@ class TransferProgressScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      session.status.name.toUpperCase(),
-                      style: Theme.of(
-                        context,
-                      ).textTheme.headlineSmall?.copyWith(color: Colors.blue),
+                      session.status == TransferStatus.failed
+                          ? 'CANCELLED'
+                          : session.status.name.toUpperCase(),
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
+                            color: session.status == TransferStatus.failed
+                                ? Colors.orange
+                                : session.status == TransferStatus.completed
+                                ? Colors.green
+                                : Colors.blue,
+                          ),
                     ),
                     const SizedBox(height: 16),
                     LinearProgressIndicator(value: session.progress),
@@ -129,6 +138,23 @@ class TransferProgressScreen extends StatelessWidget {
           ),
         ),
       );
+    } else if (session.status == TransferStatus.failed) {
+      // Show Done button for failed/cancelled transfers
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () {
+            _clearState(appState);
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          },
+          icon: const Icon(Icons.close),
+          label: const Text('Close'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.orange,
+            foregroundColor: Colors.white,
+          ),
+        ),
+      );
     }
 
     // For other states (failed, idle), show no action button
@@ -161,18 +187,23 @@ class TransferProgressScreen extends StatelessWidget {
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
-  void _cleanupPartialFile(TransferSession session, AppState appState) {
+  Future<void> _cleanupPartialFile(
+    TransferSession session,
+    AppState appState,
+  ) async {
+    // Use the service locator to get the receiver and force cleanup
     try {
-      // Use actual save path if available (from collision handling), otherwise fallback to default
-      final savePath =
-          session.actualSavePath ??
-          '${appState.settings.defaultSaveFolder}/${session.file.fileName}';
-      final file = File(savePath);
-      if (file.existsSync()) {
-        file.deleteSync();
+      if (ServiceLocator.instance.isRegistered<TcpFileReceiver>()) {
+        final receiver = ServiceLocator.instance.get<TcpFileReceiver>();
+        await receiver.forceCleanupAllTransfers();
+        if (kDebugMode) {
+          print("Forced cleanup of all active transfers through receiver");
+        }
       }
     } catch (e) {
-      // Silently ignore cleanup errors
+      if (kDebugMode) {
+        print("Error during forced cleanup: $e");
+      }
     }
   }
 
@@ -208,16 +239,20 @@ class TransferProgressScreen extends StatelessWidget {
     BuildContext context,
     AppState appState,
     TransferSession session,
-  ) {
-    // Update transfer status to failed/cancelled
+  ) async {
+    // Don't clear state immediately - keep transfer session visible during cleanup
+    // Update transfer status to failed/cancelled but keep the session active
     appState.setActiveTransfer(session.copyWith(status: TransferStatus.failed));
 
     // Clean up partial file if receiving
     if (session.direction == TransferDirection.receiving) {
-      _cleanupPartialFile(session, appState);
+      await _cleanupPartialFile(session, appState);
     }
 
-    // Always clear state and go to home screen for cancel
+    // Give a brief moment for cleanup to complete, then clear state
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    // Now clear state and navigate
     _clearState(appState);
 
     // Navigate back to home screen, clearing all intermediate screens

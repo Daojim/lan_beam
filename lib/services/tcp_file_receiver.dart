@@ -14,6 +14,7 @@ class _TransferState {
   FileInfo? fileInfo;
   String? savePath; // Track the actual save path for cleanup
   bool isCancelled = false; // Flag for immediate cancellation detection
+  bool isCompleted = false; // Flag to track successful completion
 }
 
 class TcpFileReceiver {
@@ -159,36 +160,36 @@ class TcpFileReceiver {
                       if (appState.activeTransfer?.status ==
                               TransferStatus.failed ||
                           transferState.isCancelled) {
-                        // Mark as cancelled and clean up immediately
+                        // Mark as cancelled and clean up immediately without processing data
                         transferState.isCancelled = true;
-                        await transferState.fileSink!.close();
-                        if (transferState.savePath != null) {
-                          final partialFile = File(transferState.savePath!);
-                          if (await partialFile.exists()) {
-                            await partialFile.delete();
-                            if (kDebugMode)
-                              print(
-                                "Deleted partial file: ${transferState.savePath}",
-                              );
-                          }
-                        }
-                        _activeTransfers.remove(client);
-                        client.write('CANCELLED\n');
-                        await client.flush();
-                        client.destroy();
+                        await _performImmediateCleanup(client, transferState);
                         return;
                       }
 
                       transferState.fileSink!.add(data);
                       transferState.receivedBytes += data.length;
 
-                      // Send more frequent progress updates for better synchronization
+                      // Check for cancellation after each chunk
+                      if (appState.activeTransfer?.status ==
+                          TransferStatus.failed) {
+                        if (kDebugMode)
+                          print(
+                            "Transfer cancelled during data processing - cleaning up immediately",
+                          );
+                        transferState.isCancelled = true;
+                        await _performImmediateCleanup(client, transferState);
+                        transferCompleter
+                            .complete(); // Complete normally to avoid error
+                        return;
+                      }
+
+                      // Send frequent progress updates for smooth synchronization
                       final progress =
                           transferState.receivedBytes /
                           transferState.fileInfo!.fileSizeBytes;
-                      if (transferState.receivedBytes % 32768 == 0 ||
+                      if (transferState.receivedBytes % 8192 == 0 ||
                           progress >= 1.0) {
-                        // Update every 32KB instead of 128KB for better sync
+                        // Update every 8KB for smooth progress bars
                         appState.setActiveTransfer(
                           appState.activeTransfer!.copyWith(progress: progress),
                         );
@@ -197,6 +198,9 @@ class TcpFileReceiver {
                         // Check if transfer is complete
                         if (progress >= 1.0) {
                           await transferState.fileSink!.close();
+
+                          // Mark as completed before removing from active transfers
+                          transferState.isCompleted = true;
                           _activeTransfers.remove(client);
 
                           appState.setActiveTransfer(
@@ -220,6 +224,14 @@ class TcpFileReceiver {
               },
               onError: (error) {
                 if (kDebugMode) print("Socket error during receive: $error");
+
+                // Force cleanup on socket error
+                final transferState = _activeTransfers[client];
+                if (transferState != null && !transferState.isCompleted) {
+                  transferState.isCancelled = true;
+                  _performImmediateCleanup(client, transferState);
+                }
+
                 appState.setActiveTransfer(
                   appState.activeTransfer?.copyWith(
                     status: TransferStatus.failed,
@@ -231,8 +243,31 @@ class TcpFileReceiver {
               },
               onDone: () {
                 if (kDebugMode)
-                  print("Socket connection closed during receive");
-                // Don't complete here - let _handleUserAcceptanceAndFileTransfer handle completion
+                  print(
+                    "Socket connection closed during receive - sender likely cancelled",
+                  );
+
+                // Handle sender disconnection/cancellation
+                final transferState = _activeTransfers[client];
+                if (transferState != null && !transferState.isCompleted) {
+                  // Mark as cancelled and clean up
+                  transferState.isCancelled = true;
+
+                  // Update app state to show cancellation
+                  appState.setActiveTransfer(
+                    appState.activeTransfer?.copyWith(
+                      status: TransferStatus.failed,
+                    ),
+                  );
+
+                  // Perform cleanup asynchronously
+                  _performImmediateCleanup(client, transferState);
+                }
+
+                // Complete the transfer completer to stop waiting
+                if (!transferCompleter.isCompleted) {
+                  transferCompleter.complete();
+                }
               },
             );
 
@@ -241,6 +276,14 @@ class TcpFileReceiver {
             await socketSubscription.cancel();
           } catch (e) {
             if (kDebugMode) print("Error during file transfer: $e");
+
+            // Force cleanup on exception
+            final transferState = _activeTransfers[client];
+            if (transferState != null && !transferState.isCompleted) {
+              transferState.isCancelled = true;
+              await _performImmediateCleanup(client, transferState);
+            }
+
             appState.setActiveTransfer(
               appState.activeTransfer?.copyWith(status: TransferStatus.failed),
             );
@@ -264,7 +307,22 @@ class TcpFileReceiver {
           if (kDebugMode) print("Socket error: $error");
         },
         onDone: () {
-          if (kDebugMode) print("Socket connection closed");
+          if (kDebugMode) print("Server socket connection closed");
+
+          // Handle any incomplete transfers when server stops
+          for (final entry in _activeTransfers.entries) {
+            final client = entry.key;
+            final transferState = entry.value;
+            if (!transferState.isCompleted) {
+              transferState.isCancelled = true;
+              appState.setActiveTransfer(
+                appState.activeTransfer?.copyWith(
+                  status: TransferStatus.failed,
+                ),
+              );
+              _performImmediateCleanup(client, transferState);
+            }
+          }
         },
       );
     } catch (e) {
@@ -357,18 +415,149 @@ class TcpFileReceiver {
 
   /// Monitor for transfer cancellation and immediately mark transfer state
   void _monitorCancellation(Socket client, _TransferState transferState) {
-    Timer.periodic(const Duration(milliseconds: 50), (timer) {
-      if (appState.activeTransfer?.status == TransferStatus.failed ||
-          !_activeTransfers.containsKey(client)) {
+    Timer.periodic(const Duration(milliseconds: 50), (timer) async {
+      // Only cleanup if explicitly failed, not if completed successfully
+      if (appState.activeTransfer?.status == TransferStatus.failed) {
         transferState.isCancelled = true;
+
+        // Only perform cleanup if transfer wasn't completed successfully
+        if (!transferState.isCompleted) {
+          if (kDebugMode)
+            print(
+              "Cancellation detected in monitor - forcing immediate cleanup",
+            );
+          await _performImmediateCleanup(client, transferState);
+        }
+
+        timer.cancel();
+      } else if (!_activeTransfers.containsKey(client)) {
+        // Transfer finished (either completed or failed) - stop monitoring
         timer.cancel();
       }
     });
   }
 
+  /// Perform immediate cleanup when cancellation is detected
+  Future<void> _performImmediateCleanup(
+    Socket client,
+    _TransferState transferState,
+  ) async {
+    try {
+      // Only cleanup if not already completed successfully
+      if (transferState.isCompleted) {
+        return;
+      }
+
+      // Close the file sink if it's open and wait for it to properly close
+      if (transferState.fileSink != null) {
+        try {
+          await transferState.fileSink!.flush(); // Ensure all data is written
+          await transferState.fileSink!.close(); // Close the file handle
+          transferState.fileSink = null; // Clear the reference immediately
+
+          // Give a longer delay to ensure file handle is fully released by Windows
+          await Future.delayed(const Duration(milliseconds: 500));
+
+          if (kDebugMode)
+            print("File sink closed and nullified for cancellation cleanup");
+        } catch (e) {
+          if (kDebugMode) print("Error closing file sink: $e");
+          transferState.fileSink = null; // Clear the reference even on error
+        }
+      }
+
+      // Delete the partial file with retry logic
+      if (transferState.savePath != null) {
+        final partialFile = File(transferState.savePath!);
+        if (await partialFile.exists()) {
+          // Try to delete with retries in case file handle is still being released
+          bool deleted = false;
+          for (int attempt = 0; attempt < 3 && !deleted; attempt++) {
+            try {
+              await partialFile.delete();
+              deleted = true;
+              if (kDebugMode) {
+                print(
+                  "Successfully deleted partial file: ${transferState.savePath}",
+                );
+              }
+            } catch (e) {
+              if (kDebugMode) {
+                print(
+                  "Attempt ${attempt + 1} to delete partial file failed: $e",
+                );
+              }
+              if (attempt < 2) {
+                // Wait a bit longer before retrying
+                await Future.delayed(
+                  Duration(milliseconds: 200 * (attempt + 1)),
+                );
+              } else {
+                if (kDebugMode) {
+                  print(
+                    "Failed to delete partial file after 3 attempts: ${transferState.savePath}",
+                  );
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Clean up the transfer state and notify sender (only if still active)
+      if (_activeTransfers.containsKey(client)) {
+        _activeTransfers.remove(client);
+      }
+
+      // Try to notify sender about cancellation
+      try {
+        client.write('CANCELLED\n');
+        await client.flush();
+      } catch (e) {
+        // Socket operations might fail if connection is already closed
+        if (kDebugMode) print("Could not notify sender of cancellation: $e");
+      }
+
+      try {
+        client.destroy();
+      } catch (e) {
+        // Socket might already be destroyed
+      }
+    } catch (e) {
+      if (kDebugMode) print("Error during immediate cleanup: $e");
+    }
+  }
+
   Future<void> stopListening() async {
+    // Close all active file sinks before stopping the server
+    for (final transferState in _activeTransfers.values) {
+      if (transferState.fileSink != null) {
+        try {
+          await transferState.fileSink!.flush();
+          await transferState.fileSink!.close();
+          transferState.fileSink = null;
+        } catch (e) {
+          if (kDebugMode) print("Error closing file sink during shutdown: $e");
+        }
+      }
+    }
+    _activeTransfers.clear();
+
     await _server?.close();
     _server = null;
+  }
+
+  /// Force cleanup of all active transfers (useful for cancellation)
+  Future<void> forceCleanupAllTransfers() async {
+    final transfersCopy = Map.from(_activeTransfers);
+    for (final entry in transfersCopy.entries) {
+      final client = entry.key;
+      final transferState = entry.value;
+      if (!transferState.isCompleted) {
+        transferState.isCancelled = true;
+        await _performImmediateCleanup(client, transferState);
+      }
+    }
   }
 
   /// Generates a unique file path by adding incremental numbers if file exists
